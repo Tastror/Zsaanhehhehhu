@@ -145,7 +145,7 @@ _SYLLABIC_BODIES = {'m', 'n', 'ng', 'hm', 'hn', 'hng'}
 
 
 def _normalize_body(body: str) -> str:
-    """把 wugniu 音频名风格（q 结尾、iun/iuh）规范化到 MD 通吴上形式。"""
+    """把 wugniu 音频名风格（q 结尾、iun/iuh、oe）规范化到 MD 通吴上形式。"""
     # 入声 q → h
     if body.endswith('q'):
         body = body[:-1] + 'h'
@@ -155,6 +155,9 @@ def _normalize_body(body: str) -> str:
     # 决 韵 iuh → iuih
     if body.endswith('iuh') and not body.endswith('iuih'):
         body = body[:-3] + 'iuih'
+    # 看 韵 /ø/：wugniu 音频名写作 oe，MD 通吴上写作 ae
+    if body.endswith('oe'):
+        body = body[:-2] + 'ae'
     return body
 
 
