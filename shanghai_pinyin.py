@@ -607,14 +607,29 @@ def is_cjk(ch: str) -> bool:
 # ----- 字体选择 --------------------------------------------------------------
 # 按质量优先挑选已安装的字体；越靠前越优先使用。
 
-# 适合显示 IPA（变音符号、特殊元音）的比例字体
+# 适合显示 IPA / T拼（变音符号、特殊元音、ê + 组合调号 ê̄ 之类）的比例字体。
+# 排序原则：专业 IPA/语言学字体 > 通用高质量 Latin 字体（带组合音标）> Windows 自带兜底。
 _IPA_FONT_PREF = [
-    'Charis SIL',        # SIL 专门的 IPA 字体，最好
+    # SIL 专业 IPA / 语言学字体（免费，推荐安装；对组合音标最友好）
+    'Charis SIL',
     'Charis SIL Compact',
     'Gentium Plus',
+    'Gentium Book Plus',
     'Doulos SIL',
+    # Windows 自带：优先使用 Times New Roman（按用户偏好）
+    'Times New Roman',
+    # 其他带良好组合音标支持的开源字体
+    'DejaVu Serif',
+    'DejaVu Sans',
+    'Noto Serif',
     'Noto Sans',
-    'Segoe UI',          # Windows 自带，覆盖广
+    # Windows 自带里 Latin + 变音符号排版质量较高的字体
+    'Cambria',
+    'Sitka Text',
+    'Constantia',
+    'Palatino Linotype',
+    'Segoe UI Historic', # 比 Segoe UI 多一些组合变音符号覆盖
+    'Segoe UI',          # 最终兜底
     'Microsoft YaHei UI',
     'Microsoft YaHei',
 ]
@@ -738,7 +753,7 @@ class App:
         self.output.tag_configure('tpin', foreground='#a34700',
                                   font=(self.f_ipa, 14))
         self.output.tag_configure('twu', foreground='#2f7d32',
-                                  font=(self.f_mono, 13))
+                                  font=(self.f_ipa, 14))
         self.output.tag_configure('note', foreground='#666',
                                   font=(self.f_cjk, 11, 'italic'))
         self.output.tag_configure('error', foreground='#b00020',
