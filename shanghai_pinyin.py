@@ -953,9 +953,8 @@ class App:
 # CLI / self-test / entry point
 # =============================================================================
 
-# 音系声母分类（用于 _is_sensible_combo 和 _is_tone_compatible_initial）
+# 音系声母分类
 # ----------------------------------------------------------------------
-
 # 清声母（全清 + 次清）：吴语里历史上带阴调（1/5/7）
 _CLEAR_INITIALS: frozenset[str] = frozenset({
     'p', 'ph', 't', 'th', 'ts', 'tsh',
@@ -969,90 +968,118 @@ _VOICED_INITIALS: frozenset[str] = frozenset({
 # 次浊（鼻音/边音/腭化鼻音）与零声母：阴阳皆可
 # _SONORANT_INITIALS = {'m', 'n', 'ng', 'l', 'gn'}
 
-# 腭音声母（发音部位本身腭化 /tɕ tɕʰ dʑ ɕ ʑ ɲ/）
-_PALATAL_INITIALS: frozenset[str] = frozenset({'c', 'ch', 'j', 'sh', 'zh', 'gn'})
 
-# 齿音浊清塞擦/擦音（/ts tsʰ s z/）——舌尖元音 y /ɿ/ 只跟在这 4 个声母后
-_DENTAL_SIBILANTS: frozenset[str] = frozenset({'ts', 'tsh', 's', 'z'})
+# =============================================================================
+# 声母自然类（10 组）——组内规则完全一致
+# =============================================================================
+#
+# 依发音部位 / 方式归组。同组任一成员在数据里有字 → 整组按「规则合法」；
+# 整组无字 → 视为系统缺失。组内个别成员落入"允许集合"却无字例，仅作
+# 偶然缺失，不纳入硬规则。详见 ``上海闲话.md`` 末尾「(3) 声母组 × 介音
+# × 韵母」。
+#
+# 组号（吴学 → T拼）：
+#   G1 唇塞          p ph b        → b p bh
+#   G2 唇鼻          m             → m
+#   G3 唇齿擦        f v           → f v
+#   G4 齿塞          t th d        → d t dh
+#   G5 齿鼻/边 + 娘  n gn l        → n n(娘) l
+#   G6 齿擦/塞擦     ts tsh s z    → z c s zs
+#   G7 腭塞擦/腭擦   c ch j sh zh  → j q jh x xh
+#   G8 软腭 + 晓    k kh g h      → g k gh h
+#   G9 疑母          ng            → ng
+#   G10 浊喉擦（匣） gh            → '
+#   G11 零声母       (空)          → Ø
 
-# i-介音被腭化"吸走"的声母（这些声母 + i 在现代上海话里走向腭音声母，
-# 所以 (ini, i, fin) 组合直接不出现）
-_I_MED_BLOCKING_INITIALS: frozenset[str] = frozenset({
-    'f', 'n',                   # 非母 / 泥母被 i 拉向 v ~ gn
-    'ts', 'tsh', 's', 'z',      # 精组 + i → c/ch/sh/j
-    'k', 'kh', 'g',             # 见组 + i → c/ch/j
-    'ng', 'h',                  # 疑母/晓母 + i → gn/sh
-})
-# u-介音只允许出现在这一小组声母后（舌根 + 喉音 + 零声母）
-_U_MED_ALLOWED_INITIALS: frozenset[str] = frozenset({'k', 'kh', 'g', 'h', 'gh', ''})
+_GROUP_OF_INI: dict[str, int] = {
+    'p': 1, 'ph': 1, 'b': 1,
+    'm': 2,
+    'f': 3, 'v': 3,
+    't': 4, 'th': 4, 'd': 4,
+    'n': 5, 'gn': 5, 'l': 5,
+    'ts': 6, 'tsh': 6, 's': 6, 'z': 6,
+    'c': 7, 'ch': 7, 'j': 7, 'sh': 7, 'zh': 7,
+    'k': 8, 'kh': 8, 'g': 8, 'h': 8,
+    'ng': 9,
+    'gh': 10,
+    '': 11,
+}
 
-# i-介音可搭配的韵母（基于 wugniu 语料归纳）
-_I_MED_COMPATIBLE_FINALS: frozenset[str] = frozenset({
-    'a', 'e', 'au', 'eu', 'oe', 'an', 'aon', 'on', 'aq', 'oq',
-})
-# u-介音可搭配的韵母
-_U_MED_COMPATIBLE_FINALS: frozenset[str] = frozenset({
-    'a', 'e', 'oe', 'an', 'aon', 'en', 'aq', 'eq',
-})
+# (声母组, 介音) → 允许韵母集合（吴学记号）。
+# 未列出的 (组, 介音) 表示该组在该介音下整体无字例 —— 系统级排除。
+# 条目依 ``legacy/group_grid.txt`` 归纳：组内只要有一个声母在此 (med, fin)
+# 下有字，此 fin 就进入允许集；组内全无字则不入集。
+_ALLOWED_FINS: dict[tuple[int, str], frozenset[str]] = {
+    # -------- 介音 = Ø （空介音）--------
+    (1, ''):  frozenset({'a','o','i','u','e','au','eu','oe','an','aon','on','en','in','aq','eq','oq','iq'}),
+    (2, ''):  frozenset({'a','o','i','u','e','au','eu','oe','an','aon','on','en','in','aq','eq','oq','iq'}),
+    (3, ''):  frozenset({'a','i','u','e','eu','aon','on','en','aq','eq','oq'}),
+    (4, ''):  frozenset({'a','i','u','e','au','eu','oe','an','aon','on','en','in','aq','eq','oq','iq'}),
+    (5, ''):  frozenset({'a','o','i','u','iu','e','au','eu','oe','an','aon','on','en','in','aq','eq','oq','iq','iuq'}),
+    (6, ''):  frozenset({'a','o','y','u','e','au','eu','oe','an','aon','on','en','aq','eq','oq'}),
+    (7, ''):  frozenset({'i','iu','in','iun','iq','iuq'}),
+    (8, ''):  frozenset({'a','o','u','e','au','eu','oe','an','aon','on','en','aq','eq','oq'}),
+    (9, ''):  frozenset({'a','o','u','e','au','eu','oe','an','aon','aq','eq','oq'}),
+    (10, ''): frozenset({'a','o','i','u','iu','e','au','eu','oe','an','aon','on','en','in','iun','aq','eq','oq','iq','iuq','er'}),
+    (11, ''): frozenset({'a','o','i','u','iu','e','au','eu','oe','an','aon','on','en','in','iun','aq','eq','oq','iq','iuq','m','n','ng'}),
+    # -------- 介音 = i --------
+    (1, 'i'):  frozenset({'au'}),
+    (2, 'i'):  frozenset({'au', 'eu'}),
+    (3, 'i'):  frozenset({'au'}),
+    (4, 'i'):  frozenset({'a', 'au', 'eu'}),
+    (5, 'i'):  frozenset({'e', 'au', 'eu', 'oe', 'an', 'on', 'aq', 'oq'}),
+    # G6 齿擦/塞擦 + i 系统全空（+i → 腭化走 G7）
+    (7, 'i'):  frozenset({'a', 'e', 'au', 'eu', 'oe', 'an', 'on', 'aq', 'oq'}),
+    # G8 软腭/晓 + i 系统全空（+i → 腭化走 G7）
+    # G9 疑 + i 系统全空（ng+i → 娘母 gn，写作 G5）
+    (10, 'i'): frozenset({'a', 'e', 'au', 'eu', 'oe', 'an', 'aon', 'on', 'aq', 'oq'}),
+    (11, 'i'): frozenset({'a', 'au', 'eu', 'oe', 'an', 'on', 'aq', 'oq'}),
+    # -------- 介音 = u --------
+    # G1–G7 + u 系统全空；G9 疑 + u 也全系统空；
+    # 只有舌根/喉（G8）/匣（G10）/零声母（G11）能接合口
+    (8, 'u'):  frozenset({'a', 'e', 'oe', 'an', 'aon', 'en', 'aq', 'eq'}),
+    (10, 'u'): frozenset({'a', 'e', 'oe', 'an', 'aon', 'en', 'aq', 'eq'}),
+    (11, 'u'): frozenset({'a', 'e', 'oe', 'an', 'aon', 'en', 'aq', 'eq'}),
+}
 
-# i-起始韵母（腭音声母 + 空介音时必须走这一组；同时也是"撮口"韵）
-_I_STARTING_FINALS: frozenset[str] = frozenset({
-    'i', 'in', 'iq', 'iu', 'iun', 'iuq',
-})
-# 撮口韵（/y yn yɁ/）——唇音 + 空介音不配 撮口
-_CLOSED_FRONT_ROUND_FINALS: frozenset[str] = frozenset({'iu', 'iun', 'iuq'})
-_LABIAL_INITIALS: frozenset[str] = frozenset({'p', 'ph', 'b', 'm', 'f', 'v'})
+
+# 吴拼 i-起头韵母（即 i / y（即 iu）为首的韵母）
+_I_STARTING_FINALS: frozenset[str] = frozenset({'i', 'in', 'iq', 'iu', 'iun', 'iuq'})
 
 
 def _is_sensible_combo(ini: str, med: str, fin: str) -> bool:
     """过滤掉音系上不合理的声母/介音/韵母组合。
 
-    规则依据详见 ``上海闲话.md`` 末尾「音系结构（基于 wugniu 数据归纳）」。
+    规则以「声母组 × 介音 → 允许韵母集」的形式归纳，详见 ``上海闲话.md``
+    末尾「(3) 声母组 × 介音 × 韵母」。
+
+    G5 组内 `n / gn` 互补分布（吴拼）：
+      * `gn` 只出现在 i-起头 的音节（med='i' 或 fin 以 i 开头）；
+      * `n`  只出现在非 i-起头 的音节，**唯一例外** 是吴拼 `ni` =
+        (n, Ø, i)——泥母配独立 i 元音的历史写法，T拼 里和 `gn + i` 合流不再区分。
     """
     if ini == '' and med == '' and fin == '':
         return False
-    # 成音节 m/n/ng：只允许空声母或 h（清化）；不能带介音
-    if fin in {'m', 'n', 'ng'}:
-        if med != '' or ini not in {'', 'h'}:
-            return False
-    # 成音节 er：不能带介音；允许零声母或 gh（而/兒 文读 gher）
-    if fin == 'er':
-        if med != '' or ini not in {'', 'gh'}:
-            return False
-
-    # ------------------------------------------------------------------
-    # 介音层面
-    # ------------------------------------------------------------------
-    # iu 介音在上海话里从不出现（撮口一律作韵母）
+    # 吴学 'iu' 永远是韵母 /y/，不作介音
     if med == 'iu':
         return False
-    # 齿化/见组+i 被腭化吸走，这些声母不带 i 介音
-    if med == 'i' and ini in _I_MED_BLOCKING_INITIALS:
+    g = _GROUP_OF_INI.get(ini)
+    if g is None:
         return False
-    # u 介音（合口）只在 见/晓/零声母 后出现
-    if med == 'u' and ini not in _U_MED_ALLOWED_INITIALS:
+    allowed = _ALLOWED_FINS.get((g, med))
+    if allowed is None:
         return False
-
-    # ------------------------------------------------------------------
-    # 介音-韵母 兼容
-    # ------------------------------------------------------------------
-    if med == 'i' and fin not in _I_MED_COMPATIBLE_FINALS:
-        return False
-    if med == 'u' and fin not in _U_MED_COMPATIBLE_FINALS:
+    if fin not in allowed:
         return False
 
-    # ------------------------------------------------------------------
-    # 声母-介音-韵母 的其他系统约束
-    # ------------------------------------------------------------------
-    # 腭音声母 + 空介音 → 必须接 i-起始韵母（否则腭音无从实现）
-    if ini in _PALATAL_INITIALS and med == '' and fin not in _I_STARTING_FINALS:
+    # G5 n / gn 互补分布（吴拼写法层面）
+    has_i_element = med == 'i' or fin in _I_STARTING_FINALS
+    if ini == 'gn' and not has_i_element:
         return False
-    # 舌尖元音 y /ɿ/ 只能跟在齿音 {ts, tsh, s, z} 后
-    if fin == 'y' and ini not in _DENTAL_SIBILANTS:
-        return False
-    # 唇音 + 空介音 不配 撮口韵 /y yn yɁ/（类似 labial-round 异化）
-    if ini in _LABIAL_INITIALS and med == '' and fin in _CLOSED_FRONT_ROUND_FINALS:
-        return False
+    if ini == 'n' and has_i_element:
+        # 唯一例外：吴拼 `ni` = (n, Ø, i)
+        if not (med == '' and fin == 'i'):
+            return False
 
     return True
 
