@@ -58,9 +58,10 @@ INITIALS = [
     '',
 ]
 FINALS = [
-    'a', 'o', 'i', 'y', 'u', 'iu',
-    'e', 'au', 'eu', 'oe',
-    'an', 'aon', 'on', 'en', 'in', 'iun',
+    'a', 'e', 'oe',
+    'au', 'eu', 'o', 'u',
+    'i', 'iu', 'y',
+    'an', 'aon', 'en', 'on', 'in', 'iun',
     'aq', 'eq', 'oq', 'iq', 'iuq',
     'er', 'm', 'n', 'ng',
 ]
@@ -194,7 +195,7 @@ _SYM_EMPTY    = 'x'   # 红：规则内无字
 def dump_txt(path: Path, counts: dict[tuple[str, str, str], int]) -> None:
     """把 3 张 声母 × 韵母 网格写成人类可读的 ASCII 表格（T拼 标签）。
 
-    绿色格子里填 (count) 以对应热力图的深浅；声母 `n(泥)` / `n(娘)`
+    绿色格子里填 (count) 以对应热力图的深浅；声母 `n(南)` / `n(娘)`
     对应吴学 `n` / `gn`。
     """
     ini_labels = [_ini_tpin_label(i) for i in INITIALS]
@@ -206,7 +207,7 @@ def dump_txt(path: Path, counts: dict[tuple[str, str, str], int]) -> None:
         f'数字 = 有字（绿，数字 = 汉字总数）   '
         f'{_SYM_EMPTY} = 规则内无字（红）'
     )
-    lines.append('标签：T拼（声母 n(泥)=吴学 n，n(娘)=吴学 gn）。')
+    lines.append('标签：T拼（声母 n(南)=吴学 n，n(娘)=吴学 gn）。')
     lines.append('')
     col_w = max(max(len(f) for f in fin_labels), 3) + 1
     ini_w = max(len(s) for s in ini_labels)

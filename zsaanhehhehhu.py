@@ -86,20 +86,20 @@ MEDIAL_MAP: dict[str, tuple[str, str]] = {
 FINAL_MAP: dict[str, tuple[str, str]] = {
     # 单元音 / 复合元音
     'a':   ('a',  'a'),
-    'o':   ('u',  'o'),
-    'i':   ('i',  'i'),
-    'y':   ('y',  'ɿ'),
-    'u':   ('uu', 'u'),
-    'iu':  ('ü',  'y'),
     'e':   ('ê',  'ɛ'),
+    'oe':  ('oe', 'ø'),
     'au':  ('o',  'ɔ'),
     'eu':  ('eu', 'ɤ'),
-    'oe':  ('oe', 'ø'),
+    'o':   ('u',  'o'),
+    'u':   ('uu', 'u'),
+    'i':   ('i',  'i'),
+    'iu':  ('ü',  'y'),
+    'y':   ('y',  'ɿ'),
     # 鼻尾韵
     'an':  ('an',  'ã'),
     'aon': ('aan', 'ɑ̃'),
-    'on':  ('ong', 'oŋ'),
     'en':  ('en',  'ən'),
+    'on':  ('ong', 'oŋ'),
     'in':  ('in',  'ɪɲ'),
     'iun': ('üin', 'yɪɲ'),
     # 入声
@@ -236,7 +236,7 @@ def _compose_wxue(initial: str, medial: str, final: str) -> str:
     （如 ``in``/``ih`` 里的 ``i``），则不省略，所以 ``ghin → yin``、``ghih → yih``。
     """
     # 成音节韵母
-    if initial == '' and medial == '' and final in {'m', 'n', 'ng', 'er'}:
+    if initial == '' and medial == '' and final in {'er', 'm', 'n', 'ng'}:
         return final
     if initial == 'h' and final in {'m', 'n', 'ng'}:
         return 'h' + final
@@ -362,13 +362,13 @@ _TONE_DIGIT_WUXIE: dict[str, str] = {
 
 # 内部（吴学）韵母 -> 吴协 韵母
 _FINAL_WUXIE: dict[str, str] = {
+    'oe':  'ae',
+    'iun': 'iuin',
     'aq':  'ah',
     'eq':  'eh',
     'oq':  'oh',
     'iq':  'ih',
     'iuq': 'iuih',
-    'iun': 'iuin',
-    'oe':  'ae',
     'er':  'r',
 }
 
@@ -379,7 +379,7 @@ def _compose_wuxie(initial: str, medial: str, final: str) -> str:
     fin = _FINAL_WUXIE.get(final, final)
 
     # 成音节韵母
-    if initial == '' and medial == '' and fin in {'m', 'n', 'ng', 'r'}:
+    if initial == '' and medial == '' and fin in {'r', 'm', 'n', 'ng'}:
         return fin
     if initial == 'h' and fin in {'m', 'n', 'ng'}:
         return 'h' + fin
@@ -1067,31 +1067,31 @@ _GROUP_OF_INI: dict[str, int] = {
 # 下有字，此 fin 就进入允许集；组内全无字则不入集。
 _ALLOWED_FINS: dict[tuple[int, str], frozenset[str]] = {
     # -------- 介音 = Ø （空介音）--------
-    (1, ''):  frozenset({'a','o','i','u','e','au','eu','oe','an','aon','on','en','in','aq','eq','oq','iq'}),
-    (2, ''):  frozenset({'a','o','i','u','e','au','eu','oe','an','aon','on','en','in','aq','eq','oq','iq'}),
-    (3, ''):  frozenset({'a','i','u','e','eu','aon','on','en','aq','eq','oq'}),
-    (4, ''):  frozenset({'a','i','u','e','au','eu','oe','an','aon','on','en','in','aq','eq','oq','iq'}),
-    (5, ''):  frozenset({'a','o','i','u','iu','e','au','oe','aon','on','en','in','aq','eq','oq','iq','iuq'}),
-    (6, ''):  frozenset({'a','i','u','iu','e','au','eu','oe','an','aon','on','en','in','aq','eq','oq','iq'}),
-    (7, ''):  frozenset({'a','o','y','u','e','au','eu','oe','an','aon','on','en','aq','eq','oq'}),
+    (1, ''):  frozenset({'a','e','oe','au','eu','o','u','i','an','aon','en','on','in','aq','eq','oq','iq'}),
+    (2, ''):  frozenset({'a','e','oe','au','eu','o','u','i','an','aon','en','on','in','aq','eq','oq','iq'}),
+    (3, ''):  frozenset({'a','e','eu','u','i','aon','en','on','aq','eq','oq'}),
+    (4, ''):  frozenset({'a','e','oe','au','eu','u','i','an','aon','en','on','in','aq','eq','oq','iq'}),
+    (5, ''):  frozenset({'a','e','oe','au','o','u','i','iu','aon','en','on','in','aq','eq','oq','iq','iuq'}),
+    (6, ''):  frozenset({'a','e','oe','au','eu','u','i','iu','an','aon','en','on','in','aq','eq','oq','iq'}),
+    (7, ''):  frozenset({'a','e','oe','au','eu','o','u','y','an','aon','en','on','aq','eq','oq'}),
     (8, ''):  frozenset({'i','iu','in','iun','iq','iuq'}),
-    (9, ''):  frozenset({'a','o','u','e','au','eu','oe','an','aon','on','en','aq','eq','oq'}),
-    (10, ''): frozenset({'a','o','u','e','au','eu','oe','an','aon','aq','eq','oq'}),
-    (11, ''): frozenset({'a','o','i','u','iu','e','au','eu','oe','an','aon','on','en','in','iun','aq','eq','oq','iq','iuq','er'}),
-    (12, ''): frozenset({'a','o','i','u','iu','e','au','eu','oe','an','aon','on','en','in','iun','aq','eq','oq','iq','iuq','m','n','ng'}),
+    (9, ''):  frozenset({'a','e','oe','au','eu','o','u','an','aon','en','on','aq','eq','oq'}),
+    (10, ''): frozenset({'a','e','oe','au','eu','o','u','an','aon','aq','eq','oq'}),
+    (11, ''): frozenset({'a','e','oe','au','eu','o','u','i','iu','an','aon','en','on','in','iun','aq','eq','oq','iq','iuq','er'}),
+    (12, ''): frozenset({'a','e','oe','au','eu','o','u','i','iu','an','aon','en','on','in','iun','aq','eq','oq','iq','iuq','m','n','ng'}),
     # -------- 介音 = i --------
     (1, 'i'):  frozenset({'au'}),
     (2, 'i'):  frozenset({'au', 'eu'}),
     (3, 'i'):  frozenset({'au'}),
     (4, 'i'):  frozenset({'a', 'au', 'eu'}),
-    (5, 'i'):  frozenset({'e', 'au', 'eu', 'oe', 'an', 'on', 'aq', 'oq'}),
+    (5, 'i'):  frozenset({'e', 'oe', 'au', 'eu', 'an', 'on', 'aq', 'oq'}),
     (6, 'i'):  frozenset({'au', 'eu', 'an', 'aq'}),
     # G7 齿擦/塞擦 + i 系统全空（+i → 腭化走 G8）
-    (8, 'i'):  frozenset({'a', 'e', 'au', 'eu', 'oe', 'an', 'on', 'aq', 'oq'}),
+    (8, 'i'):  frozenset({'a', 'e', 'oe', 'au', 'eu', 'an', 'on', 'aq', 'oq'}),
     # G9 软腭/晓 + i 系统全空（+i → 腭化走 G8）
     # G10 疑 + i 系统全空（ng+i → 娘母 gn，写作 G5）
-    (11, 'i'): frozenset({'a', 'e', 'au', 'eu', 'oe', 'an', 'aon', 'on', 'aq', 'oq'}),
-    (12, 'i'): frozenset({'a', 'au', 'eu', 'oe', 'an', 'on', 'aq', 'oq'}),
+    (11, 'i'): frozenset({'a', 'e', 'oe', 'au', 'eu', 'an', 'aon', 'on', 'aq', 'oq'}),
+    (12, 'i'): frozenset({'a', 'oe', 'au', 'eu', 'an', 'on', 'aq', 'oq'}),
     # -------- 介音 = u --------
     # G1–G8 + u 系统全空；G10 疑 + u 也全系统空；
     # 只有舌根/喉（G9）/匣（G11）/零声母（G12）能接合口
@@ -1102,7 +1102,7 @@ _ALLOWED_FINS: dict[tuple[int, str], frozenset[str]] = {
 
 
 # 吴拼 i-起头韵母（即 i / y（即 iu）为首的韵母）
-_I_STARTING_FINALS: frozenset[str] = frozenset({'i', 'in', 'iq', 'iu', 'iun', 'iuq'})
+_I_STARTING_FINALS: frozenset[str] = frozenset({'i', 'iu', 'in', 'iun', 'iq', 'iuq'})
 
 
 def _is_sensible_combo(ini: str, med: str, fin: str) -> bool:
@@ -1114,7 +1114,7 @@ def _is_sensible_combo(ini: str, med: str, fin: str) -> bool:
     G5 组内 `n / gn` 互补分布（吴拼）：
       * `gn` 只出现在 i-起头 的音节（med='i' 或 fin 以 i 开头）；
       * `n`  只出现在非 i-起头 的音节，**唯一例外** 是吴拼 `ni` =
-        (n, Ø, i)——泥母配独立 i 元音的历史写法，T拼 里和 `gn + i` 合流不再区分。
+        (n, Ø, i)——T拼 里和 `gn + i` 合流不再区分。
     """
     if ini == '' and med == '' and fin == '':
         return False
@@ -1159,6 +1159,13 @@ _SyllableRow = tuple[str, str, str, str, str, tuple[str, str, str, str]]
 
 
 _RANK_INI: dict[str, int] = {k: i for i, k in enumerate(INITIAL_MAP)}
+# n（南）/ gn（娘）在上海话里呈互补分布（n 不配 i-起头音节，gn 只配
+# i-起头音节），正字法上视作同一声母；排序时让它们共享等级，由后续
+# 的韵母/介音/声调键自然地把它们交错（例如 na no ni gni gniu ne gnie
+# nau gniau ...）。稳定排序会保证相同 (韵, 介, 调) 时 n-条目先于
+# gn-条目（与它们在 INITIAL_MAP 里的声明顺序一致，如 ni 在 gni 之前）。
+_RANK_INI['gn'] = _RANK_INI['n']
+
 _RANK_FIN: dict[str, int] = {k: i for i, k in enumerate(FINAL_MAP)}
 _RANK_MED: dict[str, int] = {k: i for i, k in enumerate(MEDIAL_MAP)}
 _RANK_TONE: dict[str, int] = {k: i for i, k in enumerate(TONE_MAP)}
@@ -1298,16 +1305,17 @@ def _testhanzi(verbose: bool = True) -> None:
         print(f'{"吴学":<12}{"吴协":<20}{"T拼":<14}{"IPA":<14}示例字')
         print('-' * 90)
 
+    max_examples = 5
     for wx, wxie, tp, ipa, ipad, _combo in canonical:
         chars = ipa_to_chars.get(ipad, [])
         if chars:
             found += 1
-            ch, note = chars[0]
-            sample = ch
-            if note:
-                sample += f' ({note})'
-            if len(chars) > 1:
-                sample += f'  +{len(chars) - 1}'
+            parts = []
+            for ch, note in chars[:max_examples]:
+                parts.append(f'{ch} ({note})' if note else ch)
+            sample = '  '.join(parts)
+            if len(chars) > max_examples:
+                sample += f'  +{len(chars) - max_examples}'
         else:
             sample = '（无）'
             missing_syllables.append(wx)
