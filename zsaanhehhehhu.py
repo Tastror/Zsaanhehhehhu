@@ -798,9 +798,11 @@ class App:
             padx=10, pady=6,
             highlightthickness=1, highlightcolor='#4a90e2',
             highlightbackground='#ccc',
+            undo=True, autoseparators=True, maxundo=-1,
         )
         self.entry.pack(fill='x', pady=(0, 10))
         self.entry.focus_set()
+        self._install_text_bindings(self.entry)
 
         bar = ttk.Frame(outer)
         bar.pack(fill='x', pady=(0, 10))
@@ -873,6 +875,49 @@ class App:
         self._pool = ThreadPoolExecutor(max_workers=6)
 
     # -- GUI helpers --------------------------------------------------------
+
+    @staticmethod
+    def _install_text_bindings(widget: tk.Text) -> None:
+        """给 tk.Text 补齐常用编辑快捷键。
+
+        Tk 默认没开 undo，也没有 Ctrl+A 全选 / Ctrl+Backspace 删词，
+        Windows 上 Ctrl+Z / Ctrl+Y 在中文输入法下也不一定触发，这里统一绑上。
+        """
+        def _undo(_e=None):
+            try:
+                widget.edit_undo()
+            except tk.TclError:
+                pass
+            return 'break'
+
+        def _redo(_e=None):
+            try:
+                widget.edit_redo()
+            except tk.TclError:
+                pass
+            return 'break'
+
+        def _select_all(_e=None):
+            widget.tag_add('sel', '1.0', 'end-1c')
+            widget.mark_set('insert', 'end-1c')
+            widget.see('insert')
+            return 'break'
+
+        def _delete_word_back(_e=None):
+            if widget.tag_ranges('sel'):
+                widget.delete('sel.first', 'sel.last')
+            else:
+                widget.delete('insert-1c wordstart', 'insert')
+            return 'break'
+
+        for seq in ('<Control-z>', '<Control-Z>'):
+            widget.bind(seq, _undo)
+        for seq in ('<Control-y>', '<Control-Y>',
+                    '<Control-Shift-Z>', '<Control-Shift-z>'):
+            widget.bind(seq, _redo)
+        widget.bind('<Control-a>', _select_all)
+        widget.bind('<Control-A>', _select_all)
+        widget.bind('<Control-BackSpace>', _delete_word_back)
 
     def _ui(self, fn, *args, **kwargs):
         """Schedule a UI update onto the Tk main thread."""
