@@ -206,8 +206,8 @@ _SYLL_RE = re.compile(r'^([A-Za-z\']+?)([1-8])$')
 
 
 def parse_syllable(raw: str) -> tuple[str, str, str, str, str] | None:
-    """解析一个音节字符串，返回 ``(tongwushang, initial, medial, final, tone)``；
-    其中 ``tongwushang`` 是规范化后的 MD 形式写法。"""
+    """解析一个音节字符串，返回 ``(wxue, initial, medial, final, tone)``；
+    其中 ``wxue`` 是规范化后的 MD 形式写法。"""
     m = _SYLL_RE.match(raw.strip())
     if not m:
         return None
@@ -219,11 +219,11 @@ def parse_syllable(raw: str) -> tuple[str, str, str, str, str] | None:
     if final == '' and rest == '':
         return None
     # 规范化重组成 MD 吴学形式（应用 y/w 回写规则）
-    canon = _compose_tongwushang(initial, medial, final) + tone
+    canon = _compose_wxue(initial, medial, final) + tone
     return canon, initial, medial, final, tone
 
 
-def _compose_tongwushang(initial: str, medial: str, final: str) -> str:
+def _compose_wxue(initial: str, medial: str, final: str) -> str:
     """把 (声母, 介音, 韵母) 按 MD 写法组合成吴学字符串（不含声调）。
 
     MD 简写规则（见 ``上海闲话.md``）：
@@ -553,7 +553,7 @@ def _view_from_entry(entry: dict, ch: str) -> dict:
         return {
             'variants': variants,
             'raw': '',
-            'tongwushang': '（暂空）',
+            'wxue': '（暂空）',
             'wuxie': '（暂空）',
             'tpin': '（暂空）',
             'ipa': '（暂空）',
@@ -567,7 +567,7 @@ def _view_from_entry(entry: dict, ch: str) -> dict:
         return {
             'variants': variants,
             'raw': ipa_digit,
-            'tongwushang': '?',
+            'wxue': '?',
             'wuxie': '?',
             'tpin': '?',
             'ipa': ipa_digit,
@@ -576,11 +576,11 @@ def _view_from_entry(entry: dict, ch: str) -> dict:
             'placeholder': False,
         }
     ini, med, fin, tone = parts
-    canon = _compose_tongwushang(ini, med, fin) + tone
+    canon = _compose_wxue(ini, med, fin) + tone
     return {
         'variants': variants,
         'raw': canon,
-        'tongwushang': canon,
+        'wxue': canon,
         'wuxie': to_wuxie(ini, med, fin, tone),
         'tpin': to_tpin(ini, med, fin, tone),
         'ipa': to_ipa(ini, med, fin, tone),
@@ -608,7 +608,7 @@ def query_character(ch: str, *, force_refresh: bool = False) -> list[dict]:
                 return [{
                     'variants': [ch],
                     'raw': '',
-                    'tongwushang': '（暂空）',
+                    'wxue': '（暂空）',
                     'wuxie': '（暂空）',
                     'tpin': '（暂空）',
                     'ipa': '（暂空）',
@@ -652,7 +652,7 @@ def query_character(ch: str, *, force_refresh: bool = False) -> list[dict]:
         return [{
             'variants': [ch],
             'raw': '',
-            'tongwushang': '（暂空）',
+            'wxue': '（暂空）',
             'wuxie': '（暂空）',
             'tpin': '（暂空）',
             'ipa': '（暂空）',
@@ -940,7 +940,7 @@ class App:
                 self._append('   T拼 ', 'label')
                 self._append(r['tpin'], 'tpin')
                 self._append('   吴学 ', 'label')
-                self._append(r['tongwushang'], 'wxue')
+                self._append(r['wxue'], 'wxue')
                 self._append('   吴协 ', 'label')
                 self._append(r['wuxie'], 'wxie')
             if r['note']:
@@ -969,6 +969,15 @@ def _is_sensible_combo(ini: str, med: str, fin: str) -> bool:
             return False
         if ini not in {'', 'gh'}:
             return False
+    # 介音 i / u / iu 后面不能再接 i 系韵母
+    if med in {'i', 'u', 'iu'} and fin.startswith('i'):
+        return False
+    # 介音 i / u / iu 后面不能再接 u 系韵母
+    if med in {'i', 'u', 'iu'} and fin.startswith('u'):
+        return False
+    # 零声母+舌尖元音 y 不成立——bare ``y`` 会被当作 ``ghi`` 的 y 简写
+    if ini == '' and med == '' and fin == 'y':
+        return False
     return True
 
 
@@ -1003,7 +1012,7 @@ def _enumerate_canonical_syllables() -> tuple[
                     if (not is_ru) and tone in {'7', '8'}:
                         continue
 
-                    wx = _compose_tongwushang(ini, med, fin) + tone
+                    wx = _compose_wxue(ini, med, fin) + tone
                     ps = parse_syllable(wx)
                     if not (ps and ps[1:] == (ini, med, fin, tone)):
                         aliased.append(((ini, med, fin, tone), wx, ps))
@@ -1022,7 +1031,7 @@ def _enumerate_canonical_syllables() -> tuple[
 def _testphonology(verbose: bool = True) -> None:
     """枚举所有合法 (声母, 介音, 韵母, 声调) 组合，检查两类双向反解析：
 
-      (A) 吴学字符串 ↔ 内部解码：``_compose_tongwushang(ini,med,fin)+tone``
+      (A) 吴学字符串 ↔ 内部解码：``_compose_wxue(ini,med,fin)+tone``
           → ``parse_syllable`` 能完全还原为同一组 (ini,med,fin,tone)。
       (B) IPA 数字调号 ↔ 内部解码：``to_ipa_digit`` → ``ipa_digit_to_parts``
           也能完全还原。
@@ -1114,18 +1123,14 @@ def _testhanzi(verbose: bool = True) -> None:
 
     total = len(canonical)
     print(f'\n共 {total} 个表层音节，{found} 有本地字例 / {total - found} 无字例')
-    if missing_syllables and not verbose:
-        print(f'（用 --verbose 可以看完整清单）')
 
 
 def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == '--testphonology':
-        verbose = '--quiet' not in sys.argv[2:]
-        _testphonology(verbose=verbose)
+        _testphonology()
         return
     if len(sys.argv) > 1 and sys.argv[1] == '--testhanzi':
-        verbose = '--verbose' in sys.argv[2:]
-        _testhanzi(verbose=verbose)
+        _testhanzi()
         return
     if len(sys.argv) > 1 and sys.argv[1] == '--clear-cache':
         if CACHE_PATH.exists():
