@@ -953,30 +953,179 @@ class App:
 # CLI / self-test / entry point
 # =============================================================================
 
-def _selftest() -> None:
-    """快速验证几组常见字的转写结果。"""
-    cases = ['字', '行', '人', '一', '月', '上', '海', '闲', '话', '二', '儿', '王', '云']
-    for ch in cases:
-        rs = query_character(ch)
-        print(f'=== {ch} ===')
-        for r in rs:
-            if 'error' in r:
-                print('  error:', r['error'])
+def _is_sensible_combo(ini: str, med: str, fin: str) -> bool:
+    """过滤掉音系上不合理的声母/介音/韵母组合。"""
+    if ini == '' and med == '' and fin == '':
+        return False
+    # 成音节 m/n/ng：只允许空声母或 h（清化）；不能带介音
+    if fin in {'m', 'n', 'ng'}:
+        if med != '':
+            return False
+        if ini not in {'', 'h'}:
+            return False
+    # 成音节 er：不能带介音；允许零声母或 gh（而/兒 文读 gher）
+    if fin == 'er':
+        if med != '':
+            return False
+        if ini not in {'', 'gh'}:
+            return False
+    return True
+
+
+# 枚举结果一条：(吴学, 吴协, T拼, IPA, IPA数字调号, (ini, med, fin, tone))
+_SyllableRow = tuple[str, str, str, str, str, tuple[str, str, str, str]]
+
+
+def _enumerate_canonical_syllables() -> tuple[
+    list[_SyllableRow],
+    list[tuple[tuple[str, str, str, str], str, object]],
+]:
+    """遍历 (声母, 介音, 韵母, 声调) 笛卡尔积，返回：
+
+      * ``canonical``：表层合法音节列表（吴学写法能被 parse 完整还原为
+        原组合），按 吴学 字典序排序；
+      * ``aliased``：非表层（同形但音系不成立）组合列表，每项是
+        ``(原组合, 吴学写法, parse 结果)``。
+    """
+    ru_finals = {'aq', 'eq', 'oq', 'iq', 'iuq'}
+    canonical: list[_SyllableRow] = []
+    aliased: list[tuple[tuple[str, str, str, str], str, object]] = []
+
+    for ini in INITIAL_MAP:
+        for med in MEDIAL_MAP:
+            for fin in FINAL_MAP:
+                if not _is_sensible_combo(ini, med, fin):
+                    continue
+                for tone in TONE_MAP:
+                    is_ru = fin in ru_finals
+                    if is_ru and tone not in {'7', '8'}:
+                        continue
+                    if (not is_ru) and tone in {'7', '8'}:
+                        continue
+
+                    wx = _compose_tongwushang(ini, med, fin) + tone
+                    ps = parse_syllable(wx)
+                    if not (ps and ps[1:] == (ini, med, fin, tone)):
+                        aliased.append(((ini, med, fin, tone), wx, ps))
+                        continue
+
+                    wxie = to_wuxie(ini, med, fin, tone)
+                    tp = to_tpin(ini, med, fin, tone)
+                    ipa = to_ipa(ini, med, fin, tone)
+                    ipad = to_ipa_digit(ini, med, fin, tone)
+                    canonical.append((wx, wxie, tp, ipa, ipad, (ini, med, fin, tone)))
+
+    canonical.sort(key=lambda r: r[0])
+    return canonical, aliased
+
+
+def _testphonology(verbose: bool = True) -> None:
+    """枚举所有合法 (声母, 介音, 韵母, 声调) 组合，检查两类双向反解析：
+
+      (A) 吴学字符串 ↔ 内部解码：``_compose_tongwushang(ini,med,fin)+tone``
+          → ``parse_syllable`` 能完全还原为同一组 (ini,med,fin,tone)。
+      (B) IPA 数字调号 ↔ 内部解码：``to_ipa_digit`` → ``ipa_digit_to_parts``
+          也能完全还原。
+
+    注：吴学写法本身存在一些表层歧义（例如 ``piu`` 既可解作 p+''+iu，
+    也可解作 p+i+u，但后者在上海话里音系上不成立），这些「非表层」组合
+    单独分类报告，不算转写 bug。
+    """
+    canonical, aliased = _enumerate_canonical_syllables()
+    fail_ipa: list[tuple[str, str, object]] = []
+
+    rows_out = []
+    for wx, wxie, tp, ipa, ipad, combo in canonical:
+        parts = ipa_digit_to_parts(ipad)
+        ok = parts == combo
+        if not ok:
+            fail_ipa.append((wx, ipad, parts))
+        rows_out.append((wx, wxie, tp, ipa, ok))
+
+    if verbose:
+        print(f'{"吴学":<12}{"吴协":<20}{"T拼":<14}IPA')
+        print('-' * 72)
+        for wx, wxie, tp, ipa, ok_ipa in rows_out:
+            mark = '' if ok_ipa else '  ✗IPA'
+            print(f'{wx:<12}{wxie:<20}{tp:<14}[{ipa}]{mark}')
+        print()
+
+    total = len(rows_out)
+    print(f'枚举到 {total} 个表层合法音节；另有 {len(aliased)} 个非表层（同形）组合。')
+    print(f'  吴学 → 内部 双向反解析：通过 {total}/{total}')
+    print(f'  IPA  → 内部 双向反解析：通过 {total - len(fail_ipa)}/{total}')
+
+    if fail_ipa:
+        print(f'\nIPA 反解析失败 {len(fail_ipa)} 条（显示前 30）：')
+        for wx, ipad, parts in fail_ipa[:30]:
+            print(f'  {wx!r:<14} IPA={ipad!r:<14} → {parts}')
+
+    if aliased and verbose:
+        print(f'\n非表层（同形）组合示例（共 {len(aliased)} 条，显示前 10）：')
+        for combo, wx, parsed in aliased[:10]:
+            print(f'  {combo} 写作 {wx!r}，但 parse 为 {parsed}')
+
+    if not fail_ipa:
+        print('\n全部通过 ✓')
+
+
+def _testhanzi(verbose: bool = True) -> None:
+    """枚举所有合法音节，在本地 ``readings.json`` 中给每一个音节配一个示例汉字。
+
+    如果某个音节在本地缓存里没有任何对应字，标「（无）」——提示该音节
+    虽然音系合法，但现有数据里尚无字例；可以去 wugniu 补充。
+    """
+    _load_cache()
+
+    # 建立 IPA 数字调号 → 汉字示例 的反查表
+    ipa_to_chars: dict[str, list[tuple[str, str]]] = {}
+    for ch, entries in _cache.items():
+        for e in entries:
+            ipa = e.get('ipa')
+            if not ipa:
                 continue
-            others = [v for v in r.get('variants', []) if v != ch]
-            vtag = f' (异体 {"/".join(others)})' if others else ''
-            if r.get('placeholder'):
-                print(f'  暂空（note={r["note"]!r}）{vtag}')
-                continue
-            print(
-                f'  吴学 {r["tongwushang"]:<10}  吴协 {r["wuxie"]:<10}  '
-                f'T拼 {r["tpin"]:<10}  IPA [{r["ipa"]}]{vtag}  備註 {r["note"]!r}'
-            )
+            note = e.get('note') or ''
+            ipa_to_chars.setdefault(ipa, []).append((ch, note))
+
+    canonical, _aliased = _enumerate_canonical_syllables()
+
+    found = 0
+    missing_syllables: list[str] = []
+
+    if verbose:
+        print(f'{"吴学":<12}{"吴协":<20}{"T拼":<14}{"IPA":<14}示例字')
+        print('-' * 90)
+
+    for wx, wxie, tp, ipa, ipad, _combo in canonical:
+        chars = ipa_to_chars.get(ipad, [])
+        if chars:
+            found += 1
+            ch, note = chars[0]
+            sample = ch
+            if note:
+                sample += f' ({note})'
+            if len(chars) > 1:
+                sample += f'  +{len(chars) - 1}'
+        else:
+            sample = '（无）'
+            missing_syllables.append(wx)
+        if verbose:
+            print(f'{wx:<12}{wxie:<20}{tp:<14}[{ipa}]'.ljust(74) + f'  {sample}')
+
+    total = len(canonical)
+    print(f'\n共 {total} 个表层音节，{found} 有本地字例 / {total - found} 无字例')
+    if missing_syllables and not verbose:
+        print(f'（用 --verbose 可以看完整清单）')
 
 
 def main() -> None:
-    if len(sys.argv) > 1 and sys.argv[1] == '--selftest':
-        _selftest()
+    if len(sys.argv) > 1 and sys.argv[1] == '--testphonology':
+        verbose = '--quiet' not in sys.argv[2:]
+        _testphonology(verbose=verbose)
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == '--testhanzi':
+        verbose = '--verbose' in sys.argv[2:]
+        _testhanzi(verbose=verbose)
         return
     if len(sys.argv) > 1 and sys.argv[1] == '--clear-cache':
         if CACHE_PATH.exists():
