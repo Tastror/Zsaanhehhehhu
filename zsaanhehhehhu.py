@@ -52,10 +52,10 @@ INITIAL_MAP: dict[str, tuple[str, str]] = {
     'th':  ('t',  'tʰ'),
     'd':   ('dh', 'd'),
     'n':   ('n',  'n'),
-    'l':   ('l',  'l'),
     # 日/娘母腭化鼻音 /ɲ/（wugniu 用 gn-，MD 未直接列出；T拼用 n- 记，
     # 实际腭化由后接的 i-介音体现）
     'gn':  ('n',  'ɲ'),
+    'l':   ('l',  'l'),
     'ts':  ('z',  'ts'),
     'tsh': ('c',  'tsʰ'),
     's':   ('s',  's'),
@@ -1158,6 +1158,21 @@ def _is_tone_compatible_initial(ini: str, tone: str) -> bool:
 _SyllableRow = tuple[str, str, str, str, str, tuple[str, str, str, str]]
 
 
+_RANK_INI: dict[str, int] = {k: i for i, k in enumerate(INITIAL_MAP)}
+_RANK_MED: dict[str, int] = {k: i for i, k in enumerate(MEDIAL_MAP)}
+_RANK_FIN: dict[str, int] = {k: i for i, k in enumerate(FINAL_MAP)}
+_RANK_TONE: dict[str, int] = {k: i for i, k in enumerate(TONE_MAP)}
+
+
+def _syllable_sort_key(combo: tuple[str, str, str, str]) -> tuple[int, int, int, int]:
+    """按对照表声明顺序排音节：声母 → 介音 → 韵母 → 声调。
+
+    效果：pa pā pá po pō pó pi pī pí ... 然后 pha pho phi ... bha bho bhi ...
+    """
+    ini, med, fin, tone = combo
+    return (_RANK_INI[ini], _RANK_MED[med], _RANK_FIN[fin], _RANK_TONE[tone])
+
+
 def _enumerate_canonical_syllables() -> tuple[
     list[_SyllableRow],
     list[tuple[tuple[str, str, str, str], str, object]],
@@ -1165,7 +1180,8 @@ def _enumerate_canonical_syllables() -> tuple[
     """遍历 (声母, 介音, 韵母, 声调) 笛卡尔积，返回：
 
       * ``canonical``：表层合法音节列表（吴学写法能被 parse 完整还原为
-        原组合），按 吴学 字典序排序；
+        原组合），按对照表里声母/介音/韵母/声调的声明顺序排序
+        （即 ``p*`` 全部在 ``ph*`` 之前，``ph*`` 在 ``b*`` 之前……）；
       * ``aliased``：非表层（同形但音系不成立）组合列表，每项是
         ``(原组合, 吴学写法, parse 结果)``。
     """
@@ -1199,7 +1215,7 @@ def _enumerate_canonical_syllables() -> tuple[
                     ipad = to_ipa_digit(ini, med, fin, tone)
                     canonical.append((wx, wxie, tp, ipa, ipad, (ini, med, fin, tone)))
 
-    canonical.sort(key=lambda r: r[0])
+    canonical.sort(key=lambda r: _syllable_sort_key(r[5]))
     return canonical, aliased
 
 
