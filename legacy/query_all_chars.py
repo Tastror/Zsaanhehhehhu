@@ -32,7 +32,7 @@ from threading import Event, Lock
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-import shanghai_pinyin as sp  # noqa: E402
+import zsaanhehhehhu as sp  # noqa: E402
 
 COVERAGE_PATH = Path(__file__).resolve().parent / 'syllable_coverage.json'
 READINGS_PATH = ROOT / 'readings.json'

@@ -314,6 +314,24 @@ def to_ipa_digit(initial: str, medial: str, final: str, tone: str) -> str:
     return unicodedata.normalize('NFC', ini_i + med_i + fin_i + digit)
 
 
+# T拼 规范表示 ↔ 兼容表示（见 ``上海闲话.md``）：
+#   规范   兼容
+#    '  ↔  hh         （匣母浊喉擦 /ɦ/）
+#    ê  ↔  e          （海韵 /ɛ/；调号仍留，如 ề → è、ê̄ → ē、ế → é）
+#
+# 反向（兼容 → 规范）有歧义（比如 `e` 是 ê 还是 `eu` 的一部分），但由于
+# 本工具渲染时总是从内部 (ini, med, fin, tone) 出发，只需要正向转换即可。
+def tpin_to_compat(tpin: str) -> str:
+    """把 T拼规范表示转成兼容表示：``'`` → ``hh``，``ê`` → ``e``，
+    同时保留叠加在 ``ê`` 上的声调组合变音符号（grave/macron/acute）。"""
+    # ê = e + U+0302。先分解到 NFD，去掉 U+0302（circumflex），再合回 NFC。
+    # 这样 ề (U+0065 U+0302 U+0300) → è，ê̄ → ē，ế → é，ê → e。
+    decomposed = unicodedata.normalize('NFD', tpin)
+    decomposed = decomposed.replace('\u0302', '')
+    compat = unicodedata.normalize('NFC', decomposed)
+    return compat.replace("'", 'hh')
+
+
 # =============================================================================
 # 吴协（吴语协会拼音方案）转写
 # =============================================================================
@@ -798,8 +816,19 @@ class App:
             bar, text='打开缓存文件夹',
             command=self._open_cache_dir,
         ).pack(side='left', padx=6)
+        # T拼 表示切换（规范 ' / ê  ↔  兼容 hh / e）
+        self._tpin_compat: bool = False
+        self.tpin_mode_btn = ttk.Button(
+            bar, text='当前：T拼规范表示',
+            command=self._toggle_tpin_mode,
+        )
+        self.tpin_mode_btn.pack(side='left', padx=6)
         self.status = ttk.Label(bar, text='就绪', style='Status.TLabel')
         self.status.pack(side='left', padx=14)
+
+        # 上一次渲染的数据，用于切换 T拼 表示时就地重绘
+        self._last_render_data: list[tuple[int, str, list[dict]]] = []
+        self._last_trailer: str | None = None
 
         ttk.Label(outer, text='查询结果',
                   style='Header.TLabel').pack(anchor='w', pady=(0, 4))
@@ -892,23 +921,45 @@ class App:
             results: dict[str, list[dict]] = {}
             for ch, fut in future_map.items():
                 results[ch] = fut.result()
-            for i, ch in enumerate(order, 1):
-                self._ui(self._print_char, i, ch, results[ch])
+            render_data = [(i, ch, results[ch]) for i, ch in enumerate(order, 1)]
+            for idx, ch, rs in render_data:
+                self._ui(self._print_char, idx, ch, rs)
             if not order:
                 self._ui(self._append, '（未识别到汉字）\n', 'error')
+                trailer = None
             else:
-                self._ui(
-                    self._append,
+                trailer = (
                     f'\n本地缓存文件：{CACHE_PATH}\n'
-                    f'（「暂空」条目可手动编辑该文件中的 "ipa" 字段后再查询）\n',
-                    'meta',
+                    f'（「暂空」条目可手动编辑该文件中的 "ipa" 字段后再查询）\n'
                 )
+                self._ui(self._append, trailer, 'meta')
+            # 保存本次渲染数据，切换 T拼 表示时可直接重绘
+            self._last_render_data = render_data
+            self._last_trailer = trailer
         except Exception as exc:
             self._ui(self._append, f'查询异常：{type(exc).__name__}: {exc}\n', 'error')
         finally:
             self._ui(self.status.configure, text='完成')
             self._ui(self.query_btn.configure, state='normal')
             self._ui(self.refresh_btn.configure, state='normal')
+
+    # -- T拼 表示切换 -------------------------------------------------------
+
+    def _toggle_tpin_mode(self) -> None:
+        self._tpin_compat = not self._tpin_compat
+        self.tpin_mode_btn.configure(
+            text='当前：T拼兼容表示' if self._tpin_compat else '当前：T拼规范表示'
+        )
+        self._rerender_last()
+
+    def _rerender_last(self) -> None:
+        if not self._last_render_data:
+            return
+        self.clear()
+        for idx, ch, rs in self._last_render_data:
+            self._print_char(idx, ch, rs)
+        if self._last_trailer:
+            self._append(self._last_trailer, 'meta')
 
     def _print_char(self, idx: int, ch: str, readings: list[dict]) -> None:
         self._append(f'{idx}. ', 'section')
@@ -938,7 +989,10 @@ class App:
             else:
                 self._append(f'[{r["ipa"]}]', 'ipa')
                 self._append('   T拼 ', 'label')
-                self._append(r['tpin'], 'tpin')
+                tpin = r['tpin']
+                if self._tpin_compat:
+                    tpin = tpin_to_compat(tpin)
+                self._append(tpin, 'tpin')
                 self._append('   吴学 ', 'label')
                 self._append(r['wxue'], 'wxue')
                 self._append('   吴协 ', 'label')

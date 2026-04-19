@@ -10,7 +10,7 @@ plot_grid.py
 
 颜色：
 
-* 灰色 —— 被 ``shanghai_pinyin._is_sensible_combo`` 判为不合法（系统性驱逐）
+* 灰色 —— 被 ``zsaanhehhehhu._is_sensible_combo`` 判为不合法（系统性驱逐）
 * 绿色 —— 规则合法、且 ``syllable_coverage.json`` 里至少有一个声调下有字；
   颜色深浅随该 (声母, 介音, 韵母) 下**汉字总数**（跨声调求和）
   以对数刻度渐变：字越多越深。
@@ -41,7 +41,7 @@ import matplotlib.colors as mcolors  # noqa: E402
 from matplotlib.patches import Patch  # noqa: E402
 import numpy as np  # noqa: E402
 
-import shanghai_pinyin as sp  # noqa: E402
+import zsaanhehhehhu as sp  # noqa: E402
 
 
 COVERAGE_PATH = _HERE / 'syllable_coverage.json'

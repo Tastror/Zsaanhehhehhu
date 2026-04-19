@@ -40,7 +40,7 @@ _ROOT = _HERE.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-import shanghai_pinyin as sp  # noqa: E402
+import zsaanhehhehhu as sp  # noqa: E402
 
 
 COVERAGE_PATH = _HERE / 'syllable_coverage.json'
