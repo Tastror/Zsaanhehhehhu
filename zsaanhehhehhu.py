@@ -1159,18 +1159,20 @@ _SyllableRow = tuple[str, str, str, str, str, tuple[str, str, str, str]]
 
 
 _RANK_INI: dict[str, int] = {k: i for i, k in enumerate(INITIAL_MAP)}
-_RANK_MED: dict[str, int] = {k: i for i, k in enumerate(MEDIAL_MAP)}
 _RANK_FIN: dict[str, int] = {k: i for i, k in enumerate(FINAL_MAP)}
+_RANK_MED: dict[str, int] = {k: i for i, k in enumerate(MEDIAL_MAP)}
 _RANK_TONE: dict[str, int] = {k: i for i, k in enumerate(TONE_MAP)}
 
 
 def _syllable_sort_key(combo: tuple[str, str, str, str]) -> tuple[int, int, int, int]:
-    """按对照表声明顺序排音节：声母 → 介音 → 韵母 → 声调。
+    """按对照表声明顺序排音节：声母 → 韵母 → 介音 → 声调。
 
-    效果：pa pā pá po pō pó pi pī pí ... 然后 pha pho phi ... bha bho bhi ...
+    把「介音」排在「韵母」之后，是为了让同一韵母的带介音变体紧跟在零介音
+    变体后面（例如 ``pau`` 之后紧跟 ``piau``），而不是把所有无介音条目集中
+    在一起、带介音条目集中在另一块。
     """
     ini, med, fin, tone = combo
-    return (_RANK_INI[ini], _RANK_MED[med], _RANK_FIN[fin], _RANK_TONE[tone])
+    return (_RANK_INI[ini], _RANK_FIN[fin], _RANK_MED[med], _RANK_TONE[tone])
 
 
 def _enumerate_canonical_syllables() -> tuple[
