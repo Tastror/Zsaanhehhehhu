@@ -953,30 +953,118 @@ class App:
 # CLI / self-test / entry point
 # =============================================================================
 
+# 音系声母分类（用于 _is_sensible_combo 和 _is_tone_compatible_initial）
+# ----------------------------------------------------------------------
+
+# 清声母（全清 + 次清）：吴语里历史上带阴调（1/5/7）
+_CLEAR_INITIALS: frozenset[str] = frozenset({
+    'p', 'ph', 't', 'th', 'ts', 'tsh',
+    'c', 'ch', 'k', 'kh',
+    'f', 's', 'sh', 'h',
+})
+# 全浊：带阳调（6/8）
+_VOICED_INITIALS: frozenset[str] = frozenset({
+    'b', 'd', 'z', 'j', 'g', 'v', 'zh', 'gh',
+})
+# 次浊（鼻音/边音/腭化鼻音）与零声母：阴阳皆可
+# _SONORANT_INITIALS = {'m', 'n', 'ng', 'l', 'gn'}
+
+# 腭音声母（发音部位本身腭化 /tɕ tɕʰ dʑ ɕ ʑ ɲ/）
+_PALATAL_INITIALS: frozenset[str] = frozenset({'c', 'ch', 'j', 'sh', 'zh', 'gn'})
+
+# 齿音浊清塞擦/擦音（/ts tsʰ s z/）——舌尖元音 y /ɿ/ 只跟在这 4 个声母后
+_DENTAL_SIBILANTS: frozenset[str] = frozenset({'ts', 'tsh', 's', 'z'})
+
+# i-介音被腭化"吸走"的声母（这些声母 + i 在现代上海话里走向腭音声母，
+# 所以 (ini, i, fin) 组合直接不出现）
+_I_MED_BLOCKING_INITIALS: frozenset[str] = frozenset({
+    'f', 'n',                   # 非母 / 泥母被 i 拉向 v ~ gn
+    'ts', 'tsh', 's', 'z',      # 精组 + i → c/ch/sh/j
+    'k', 'kh', 'g',             # 见组 + i → c/ch/j
+    'ng', 'h',                  # 疑母/晓母 + i → gn/sh
+})
+# u-介音只允许出现在这一小组声母后（舌根 + 喉音 + 零声母）
+_U_MED_ALLOWED_INITIALS: frozenset[str] = frozenset({'k', 'kh', 'g', 'h', 'gh', ''})
+
+# i-介音可搭配的韵母（基于 wugniu 语料归纳）
+_I_MED_COMPATIBLE_FINALS: frozenset[str] = frozenset({
+    'a', 'e', 'au', 'eu', 'oe', 'an', 'aon', 'on', 'aq', 'oq',
+})
+# u-介音可搭配的韵母
+_U_MED_COMPATIBLE_FINALS: frozenset[str] = frozenset({
+    'a', 'e', 'oe', 'an', 'aon', 'en', 'aq', 'eq',
+})
+
+# i-起始韵母（腭音声母 + 空介音时必须走这一组；同时也是"撮口"韵）
+_I_STARTING_FINALS: frozenset[str] = frozenset({
+    'i', 'in', 'iq', 'iu', 'iun', 'iuq',
+})
+# 撮口韵（/y yn yɁ/）——唇音 + 空介音不配 撮口
+_CLOSED_FRONT_ROUND_FINALS: frozenset[str] = frozenset({'iu', 'iun', 'iuq'})
+_LABIAL_INITIALS: frozenset[str] = frozenset({'p', 'ph', 'b', 'm', 'f', 'v'})
+
+
 def _is_sensible_combo(ini: str, med: str, fin: str) -> bool:
-    """过滤掉音系上不合理的声母/介音/韵母组合。"""
+    """过滤掉音系上不合理的声母/介音/韵母组合。
+
+    规则依据详见 ``上海闲话.md`` 末尾「音系结构（基于 wugniu 数据归纳）」。
+    """
     if ini == '' and med == '' and fin == '':
         return False
     # 成音节 m/n/ng：只允许空声母或 h（清化）；不能带介音
     if fin in {'m', 'n', 'ng'}:
-        if med != '':
-            return False
-        if ini not in {'', 'h'}:
+        if med != '' or ini not in {'', 'h'}:
             return False
     # 成音节 er：不能带介音；允许零声母或 gh（而/兒 文读 gher）
     if fin == 'er':
-        if med != '':
+        if med != '' or ini not in {'', 'gh'}:
             return False
-        if ini not in {'', 'gh'}:
-            return False
-    # 介音 i / u / iu 后面不能再接 i 系韵母
-    if med in {'i', 'u', 'iu'} and fin.startswith('i'):
+
+    # ------------------------------------------------------------------
+    # 介音层面
+    # ------------------------------------------------------------------
+    # iu 介音在上海话里从不出现（撮口一律作韵母）
+    if med == 'iu':
         return False
-    # 介音 i / u / iu 后面不能再接 u 系韵母
-    if med in {'i', 'u', 'iu'} and fin.startswith('u'):
+    # 齿化/见组+i 被腭化吸走，这些声母不带 i 介音
+    if med == 'i' and ini in _I_MED_BLOCKING_INITIALS:
         return False
-    # 零声母+舌尖元音 y 不成立——bare ``y`` 会被当作 ``ghi`` 的 y 简写
-    if ini == '' and med == '' and fin == 'y':
+    # u 介音（合口）只在 见/晓/零声母 后出现
+    if med == 'u' and ini not in _U_MED_ALLOWED_INITIALS:
+        return False
+
+    # ------------------------------------------------------------------
+    # 介音-韵母 兼容
+    # ------------------------------------------------------------------
+    if med == 'i' and fin not in _I_MED_COMPATIBLE_FINALS:
+        return False
+    if med == 'u' and fin not in _U_MED_COMPATIBLE_FINALS:
+        return False
+
+    # ------------------------------------------------------------------
+    # 声母-介音-韵母 的其他系统约束
+    # ------------------------------------------------------------------
+    # 腭音声母 + 空介音 → 必须接 i-起始韵母（否则腭音无从实现）
+    if ini in _PALATAL_INITIALS and med == '' and fin not in _I_STARTING_FINALS:
+        return False
+    # 舌尖元音 y /ɿ/ 只能跟在齿音 {ts, tsh, s, z} 后
+    if fin == 'y' and ini not in _DENTAL_SIBILANTS:
+        return False
+    # 唇音 + 空介音 不配 撮口韵 /y yn yɁ/（类似 labial-round 异化）
+    if ini in _LABIAL_INITIALS and med == '' and fin in _CLOSED_FRONT_ROUND_FINALS:
+        return False
+
+    return True
+
+
+def _is_tone_compatible_initial(ini: str, tone: str) -> bool:
+    """阴阳调-声母 制约：清声母只配阴调、全浊只配阳调。
+
+    次浊（m/n/ng/l/gn）与零声母不受限制。
+    """
+    if tone in {'1', '5', '7'} and ini in _VOICED_INITIALS:
+        return False
+    if tone in {'6', '8'} and ini in _CLEAR_INITIALS:
         return False
     return True
 
@@ -1010,6 +1098,8 @@ def _enumerate_canonical_syllables() -> tuple[
                     if is_ru and tone not in {'7', '8'}:
                         continue
                     if (not is_ru) and tone in {'7', '8'}:
+                        continue
+                    if not _is_tone_compatible_initial(ini, tone):
                         continue
 
                     wx = _compose_wxue(ini, med, fin) + tone
