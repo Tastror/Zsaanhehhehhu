@@ -5,7 +5,7 @@
 输入汉字序列，输出每个字对应的：
     (1) IPA
     (2) T拼（Tastror 拼音方案）
-    (3) 通吴上（通用吴语拼音-上海话）
+    (3) 吴学（通用吴语拼音-上海话）
 
 数据来源：https://www.wugniu.com （字音查詢 → 上海閒話）
 
@@ -36,10 +36,10 @@ from tkinter import font as tkfont, ttk, scrolledtext
 
 
 # =============================================================================
-# 通吴上 <-> T拼 / IPA 对照表
+# 吴学 <-> T拼 / IPA 对照表
 # =============================================================================
 
-# 声母：通吴上 key -> (T拼, IPA)
+# 声母：吴学 key -> (T拼, IPA)
 INITIAL_MAP: dict[str, tuple[str, str]] = {
     'p':   ('b',  'p'),
     'ph':  ('p',  'pʰ'),
@@ -73,7 +73,7 @@ INITIAL_MAP: dict[str, tuple[str, str]] = {
     '':    ('',   ''),  # 零声母（影母）
 }
 
-# 介音：通吴上 -> (T拼, IPA)
+# 介音：吴学 -> (T拼, IPA)
 MEDIAL_MAP: dict[str, tuple[str, str]] = {
     '':   ('',  ''),
     'i':  ('i', 'j'),
@@ -81,7 +81,7 @@ MEDIAL_MAP: dict[str, tuple[str, str]] = {
     'iu': ('ü', 'ɥ'),
 }
 
-# 主韵母：通吴上 -> (T拼, IPA)
+# 主韵母：吴学 -> (T拼, IPA)
 FINAL_MAP: dict[str, tuple[str, str]] = {
     # 单元音 / 复合元音
     'a':   ('a',  'a'),
@@ -132,7 +132,7 @@ _DIGIT_TO_TONE_KEY: dict[str, str] = {v[2]: k for k, v in TONE_MAP.items()}
 
 
 # =============================================================================
-# 通吴上音节解析
+# 吴学音节解析
 # =============================================================================
 
 _INITIALS_ORDERED = sorted(
@@ -145,19 +145,6 @@ _SYLLABIC_BODIES = {'m', 'n', 'ng', 'hm', 'hn', 'hng'}
 
 
 def _normalize_body(body: str) -> str:
-    """把 wugniu 音频名风格（q 结尾、iun/iuh、oe）规范化到 MD 通吴上形式。"""
-    # 入声 q → h
-    if body.endswith('q'):
-        body = body[:-1] + 'h'
-    # 君 韵 iun → iuin（仅在词尾）
-    if body.endswith('iun') and not body.endswith('iuin'):
-        body = body[:-3] + 'iuin'
-    # 决 韵 iuh → iuih
-    if body.endswith('iuh') and not body.endswith('iuih'):
-        body = body[:-3] + 'iuih'
-    # 看 韵 /ø/：wugniu 音频名写作 oe，MD 通吴上写作 ae
-    if body.endswith('oe'):
-        body = body[:-2] + 'ae'
     return body
 
 
@@ -230,13 +217,13 @@ def parse_syllable(raw: str) -> tuple[str, str, str, str, str] | None:
     medial, final = _split_final(rest)
     if final == '' and rest == '':
         return None
-    # 规范化重组成 MD 通吴上形式（应用 y/w 回写规则）
+    # 规范化重组成 MD 吴学形式（应用 y/w 回写规则）
     canon = _compose_tongwushang(initial, medial, final) + tone
     return canon, initial, medial, final, tone
 
 
 def _compose_tongwushang(initial: str, medial: str, final: str) -> str:
-    """把 (声母, 介音, 韵母) 按 MD 写法组合成通吴上字符串（不含声调）。
+    """把 (声母, 介音, 韵母) 按 MD 写法组合成吴学字符串（不含声调）。
 
     MD 简写规则（见 ``上海闲话.md``）：
 
@@ -282,7 +269,7 @@ def _compose_tongwushang(initial: str, medial: str, final: str) -> str:
 
 
 # =============================================================================
-# 转写：通吴上 → T拼 / IPA
+# 转写：吴学 → T拼 / IPA
 # =============================================================================
 
 def _place_tone_tpin(text: str, tone: str) -> str:
@@ -417,7 +404,7 @@ def fetch_readings(ch: str, timeout: float = 10.0) -> tuple[tuple[str, str, str]
 #     }
 #
 # 条目的 ``ipa`` 字段为 ``null`` 或空字符串 → 也算暂空；手动填好 IPA 再保存
-# 文件即可，后续程序能自动反解析出 T拼 / 通吴上。
+# 文件即可，后续程序能自动反解析出 T拼 / 吴学。
 
 CACHE_PATH = Path(__file__).resolve().parent / 'readings.json'
 
@@ -634,7 +621,7 @@ _IPA_FONT_PREF = [
     'Microsoft YaHei',
 ]
 
-# 中文+拉丁混排的字体（用于正文 / T拼 / 通吴上 / 中文字符）
+# 中文+拉丁混排的字体（用于正文 / T拼 / 吴学 / 中文字符）
 _CJK_FONT_PREF = [
     'Microsoft YaHei UI',
     'Microsoft YaHei',
@@ -672,7 +659,7 @@ def _pick_font(preferred: list[str], fallback: str = 'TkDefaultFont') -> str:
 class App:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
-        root.title('上海闲话字音查询  ·  IPA / T拼 / 通吴上')
+        root.title('上海闲话字音查询  ·  IPA / T拼 / 吴学')
         root.geometry('960x720')
         try:
             root.configure(bg='#fafafa')
@@ -855,13 +842,13 @@ class App:
                 self._append('（暂空）', 'todo')
                 self._append('   T拼 ', 'label')
                 self._append('（暂空）', 'todo')
-                self._append('   通吴上 ', 'label')
+                self._append('   吴学 ', 'label')
                 self._append('（暂空）', 'todo')
             else:
                 self._append(f'[{r["ipa"]}]', 'ipa')
                 self._append('   T拼 ', 'label')
                 self._append(r['tpin'], 'tpin')
-                self._append('   通吴上 ', 'label')
+                self._append('   吴学 ', 'label')
                 self._append(r['tongwushang'], 'twu')
             if r['note']:
                 self._append(f'   — {r["note"]}', 'note')
@@ -889,7 +876,7 @@ def _selftest() -> None:
                 print(f'  暂空（note={r["note"]!r}）{vtag}')
                 continue
             print(
-                f'  通吴上 {r["tongwushang"]:<10}  T拼 {r["tpin"]:<10}  '
+                f'  吴学 {r["tongwushang"]:<10}  T拼 {r["tpin"]:<10}  '
                 f'IPA [{r["ipa"]}]{vtag}  備註 {r["note"]!r}'
             )
 
