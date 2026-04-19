@@ -715,7 +715,7 @@ class App:
         self.query_btn = ttk.Button(bar, text='查询  (Ctrl+Enter)', command=self.on_query)
         self.query_btn.pack(side='left')
         self.refresh_btn = ttk.Button(
-            bar, text='强制刷新（忽略缓存）',
+            bar, text='强制查询（忽略缓存）',
             command=lambda: self.on_query(force=True),
         )
         self.refresh_btn.pack(side='left', padx=6)
