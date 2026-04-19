@@ -4,18 +4,20 @@ group_analyze.py
 
 按 "声母自然类" 聚合分析 ``syllable_coverage.json``。
 
-用户给定的 10 个自然类（每组内部规则应完全一致）：
+用户给定的自然类（每组内部规则应完全一致）：
 
     G1 = {p, ph, b}          唇塞
     G2 = {m}                 唇鼻
     G3 = {f, v}              唇齿擦
     G4 = {t, th, d}          齿塞
-    G5 = {n, gn, l}          齿鼻/边
-    G6 = {ts, tsh, s, z}     齿擦/齿塞擦
-    G7 = {c, ch, j, sh, zh}  腭塞擦/腭擦
-    G8 = {k, kh, g, ng, h}   软腭/喉
-    G9 = {gh}                浊喉擦
-    G10 = {Ø}                零声母
+    G5 = {n, gn}             齿鼻 + 齿腭鼻（互补）
+    G6 = {l}                 边
+    G7 = {ts, tsh, s, z}     齿擦/齿塞擦
+    G8 = {c, ch, j, sh, zh}  腭塞擦/腭擦
+    G9 = {k, kh, g, h}       软腭塞 + 晓
+    G10 = {ng}               疑母
+    G11 = {gh}               浊喉擦（匣）
+    G12 = {Ø}                零声母
 
 对每个 (group, med, fin) 三元组：
 - 若组内 **至少一个** 声母数据里有字 —— 记为 A (accidental-OK)：
@@ -45,19 +47,20 @@ COVERAGE_PATH = _HERE / 'syllable_coverage.json'
 OUT_PATH = _HERE / 'group_grid.txt'
 
 
-# 用户给定的 10 个自然类
+# 用户给定的自然类
 GROUPS: list[tuple[str, list[str]]] = [
-    ('G1  p/ph/b    ', ['p', 'ph', 'b']),
-    ('G2  m         ', ['m']),
-    ('G3  f/v       ', ['f', 'v']),
-    ('G4  t/th/d    ', ['t', 'th', 'd']),
-    ('G5  n/gn/l    ', ['n', 'gn', 'l']),
-    ('G6  ts/tsh/s/z', ['ts', 'tsh', 's', 'z']),
-    ('G7  c/ch/j/sh/zh', ['c', 'ch', 'j', 'sh', 'zh']),
-    ('G8  k/kh/g/h  ', ['k', 'kh', 'g', 'h']),
-    ('G9  ng        ', ['ng']),
-    ('G10 gh        ', ['gh']),
-    ('G11 Ø         ', ['']),
+    ('G1  p/ph/b      ', ['p', 'ph', 'b']),
+    ('G2  m           ', ['m']),
+    ('G3  f/v         ', ['f', 'v']),
+    ('G4  t/th/d      ', ['t', 'th', 'd']),
+    ('G5  n/gn        ', ['n', 'gn']),
+    ('G6  l           ', ['l']),
+    ('G7  ts/tsh/s/z  ', ['ts', 'tsh', 's', 'z']),
+    ('G8  c/ch/j/sh/zh', ['c', 'ch', 'j', 'sh', 'zh']),
+    ('G9  k/kh/g/h    ', ['k', 'kh', 'g', 'h']),
+    ('G10 ng          ', ['ng']),
+    ('G11 gh          ', ['gh']),
+    ('G12 Ø           ', ['']),
 ]
 
 MEDIAL_ORDER = ['', 'i', 'u']

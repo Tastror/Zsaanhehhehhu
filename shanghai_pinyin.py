@@ -970,7 +970,7 @@ _VOICED_INITIALS: frozenset[str] = frozenset({
 
 
 # =============================================================================
-# 声母自然类（10 组）——组内规则完全一致
+# 声母自然类（12 组）——组内规则完全一致
 # =============================================================================
 #
 # 依发音部位 / 方式归组。同组任一成员在数据里有字 → 整组按「规则合法」；
@@ -979,30 +979,32 @@ _VOICED_INITIALS: frozenset[str] = frozenset({
 # × 韵母」。
 #
 # 组号（吴学 → T拼）：
-#   G1 唇塞          p ph b        → b p bh
-#   G2 唇鼻          m             → m
-#   G3 唇齿擦        f v           → f v
-#   G4 齿塞          t th d        → d t dh
-#   G5 齿鼻/边 + 娘  n gn l        → n n(娘) l
-#   G6 齿擦/塞擦     ts tsh s z    → z c s zs
-#   G7 腭塞擦/腭擦   c ch j sh zh  → j q jh x xh
-#   G8 软腭 + 晓    k kh g h      → g k gh h
-#   G9 疑母          ng            → ng
-#   G10 浊喉擦（匣） gh            → '
-#   G11 零声母       (空)          → Ø
+#   G1 唇塞            p ph b        → b p bh
+#   G2 唇鼻            m             → m
+#   G3 唇齿擦          f v           → f v
+#   G4 齿塞            t th d        → d t dh
+#   G5 齿鼻 + 娘母     n gn          → n n(娘)          # n/gn 互补分布
+#   G6 边              l             → l
+#   G7 齿擦/塞擦       ts tsh s z    → z c s zs
+#   G8 腭塞擦/腭擦     c ch j sh zh  → j q jh x xh
+#   G9 软腭塞 + 晓     k kh g h      → g k gh h
+#   G10 疑母           ng            → ng
+#   G11 浊喉擦（匣）   gh            → '
+#   G12 零声母         (空)          → Ø
 
 _GROUP_OF_INI: dict[str, int] = {
     'p': 1, 'ph': 1, 'b': 1,
     'm': 2,
     'f': 3, 'v': 3,
     't': 4, 'th': 4, 'd': 4,
-    'n': 5, 'gn': 5, 'l': 5,
-    'ts': 6, 'tsh': 6, 's': 6, 'z': 6,
-    'c': 7, 'ch': 7, 'j': 7, 'sh': 7, 'zh': 7,
-    'k': 8, 'kh': 8, 'g': 8, 'h': 8,
-    'ng': 9,
-    'gh': 10,
-    '': 11,
+    'n': 5, 'gn': 5,
+    'l': 6,
+    'ts': 7, 'tsh': 7, 's': 7, 'z': 7,
+    'c': 8, 'ch': 8, 'j': 8, 'sh': 8, 'zh': 8,
+    'k': 9, 'kh': 9, 'g': 9, 'h': 9,
+    'ng': 10,
+    'gh': 11,
+    '': 12,
 }
 
 # (声母组, 介音) → 允许韵母集合（吴学记号）。
@@ -1015,31 +1017,33 @@ _ALLOWED_FINS: dict[tuple[int, str], frozenset[str]] = {
     (2, ''):  frozenset({'a','o','i','u','e','au','eu','oe','an','aon','on','en','in','aq','eq','oq','iq'}),
     (3, ''):  frozenset({'a','i','u','e','eu','aon','on','en','aq','eq','oq'}),
     (4, ''):  frozenset({'a','i','u','e','au','eu','oe','an','aon','on','en','in','aq','eq','oq','iq'}),
-    (5, ''):  frozenset({'a','o','i','u','iu','e','au','eu','oe','an','aon','on','en','in','aq','eq','oq','iq','iuq'}),
-    (6, ''):  frozenset({'a','o','y','u','e','au','eu','oe','an','aon','on','en','aq','eq','oq'}),
-    (7, ''):  frozenset({'i','iu','in','iun','iq','iuq'}),
-    (8, ''):  frozenset({'a','o','u','e','au','eu','oe','an','aon','on','en','aq','eq','oq'}),
-    (9, ''):  frozenset({'a','o','u','e','au','eu','oe','an','aon','aq','eq','oq'}),
-    (10, ''): frozenset({'a','o','i','u','iu','e','au','eu','oe','an','aon','on','en','in','iun','aq','eq','oq','iq','iuq','er'}),
-    (11, ''): frozenset({'a','o','i','u','iu','e','au','eu','oe','an','aon','on','en','in','iun','aq','eq','oq','iq','iuq','m','n','ng'}),
+    (5, ''):  frozenset({'a','o','i','u','iu','e','au','oe','aon','on','en','in','aq','eq','oq','iq','iuq'}),
+    (6, ''):  frozenset({'a','i','u','iu','e','au','eu','oe','an','aon','on','en','in','aq','eq','oq','iq'}),
+    (7, ''):  frozenset({'a','o','y','u','e','au','eu','oe','an','aon','on','en','aq','eq','oq'}),
+    (8, ''):  frozenset({'i','iu','in','iun','iq','iuq'}),
+    (9, ''):  frozenset({'a','o','u','e','au','eu','oe','an','aon','on','en','aq','eq','oq'}),
+    (10, ''): frozenset({'a','o','u','e','au','eu','oe','an','aon','aq','eq','oq'}),
+    (11, ''): frozenset({'a','o','i','u','iu','e','au','eu','oe','an','aon','on','en','in','iun','aq','eq','oq','iq','iuq','er'}),
+    (12, ''): frozenset({'a','o','i','u','iu','e','au','eu','oe','an','aon','on','en','in','iun','aq','eq','oq','iq','iuq','m','n','ng'}),
     # -------- 介音 = i --------
     (1, 'i'):  frozenset({'au'}),
     (2, 'i'):  frozenset({'au', 'eu'}),
     (3, 'i'):  frozenset({'au'}),
     (4, 'i'):  frozenset({'a', 'au', 'eu'}),
     (5, 'i'):  frozenset({'e', 'au', 'eu', 'oe', 'an', 'on', 'aq', 'oq'}),
-    # G6 齿擦/塞擦 + i 系统全空（+i → 腭化走 G7）
-    (7, 'i'):  frozenset({'a', 'e', 'au', 'eu', 'oe', 'an', 'on', 'aq', 'oq'}),
-    # G8 软腭/晓 + i 系统全空（+i → 腭化走 G7）
-    # G9 疑 + i 系统全空（ng+i → 娘母 gn，写作 G5）
-    (10, 'i'): frozenset({'a', 'e', 'au', 'eu', 'oe', 'an', 'aon', 'on', 'aq', 'oq'}),
-    (11, 'i'): frozenset({'a', 'au', 'eu', 'oe', 'an', 'on', 'aq', 'oq'}),
+    (6, 'i'):  frozenset({'au', 'eu', 'an', 'aq'}),
+    # G7 齿擦/塞擦 + i 系统全空（+i → 腭化走 G8）
+    (8, 'i'):  frozenset({'a', 'e', 'au', 'eu', 'oe', 'an', 'on', 'aq', 'oq'}),
+    # G9 软腭/晓 + i 系统全空（+i → 腭化走 G8）
+    # G10 疑 + i 系统全空（ng+i → 娘母 gn，写作 G5）
+    (11, 'i'): frozenset({'a', 'e', 'au', 'eu', 'oe', 'an', 'aon', 'on', 'aq', 'oq'}),
+    (12, 'i'): frozenset({'a', 'au', 'eu', 'oe', 'an', 'on', 'aq', 'oq'}),
     # -------- 介音 = u --------
-    # G1–G7 + u 系统全空；G9 疑 + u 也全系统空；
-    # 只有舌根/喉（G8）/匣（G10）/零声母（G11）能接合口
-    (8, 'u'):  frozenset({'a', 'e', 'oe', 'an', 'aon', 'en', 'aq', 'eq'}),
-    (10, 'u'): frozenset({'a', 'e', 'oe', 'an', 'aon', 'en', 'aq', 'eq'}),
+    # G1–G8 + u 系统全空；G10 疑 + u 也全系统空；
+    # 只有舌根/喉（G9）/匣（G11）/零声母（G12）能接合口
+    (9, 'u'):  frozenset({'a', 'e', 'oe', 'an', 'aon', 'en', 'aq', 'eq'}),
     (11, 'u'): frozenset({'a', 'e', 'oe', 'an', 'aon', 'en', 'aq', 'eq'}),
+    (12, 'u'): frozenset({'a', 'e', 'oe', 'an', 'aon', 'en', 'aq', 'eq'}),
 }
 
 
@@ -1087,7 +1091,7 @@ def _is_sensible_combo(ini: str, med: str, fin: str) -> bool:
 def _is_tone_compatible_initial(ini: str, tone: str) -> bool:
     """阴阳调-声母 制约：清声母只配阴调、全浊只配阳调。
 
-    次浊（m/n/ng/l/gn）与零声母不受限制。
+    次浊（m/n/gn/l/ng）与零声母不受限制。
     """
     if tone in {'1', '5', '7'} and ini in _VOICED_INITIALS:
         return False

@@ -138,7 +138,7 @@ def analyze():
 
 _INITIAL_ORDER = [
     'p', 'ph', 'b', 'm', 'f', 'v',
-    't', 'th', 'd', 'n', 'l', 'gn',
+    't', 'th', 'd', 'n', 'gn', 'l',
     'ts', 'tsh', 's', 'z',
     'c', 'ch', 'j', 'sh', 'zh',
     'k', 'kh', 'g', 'ng', 'h', 'gh',
