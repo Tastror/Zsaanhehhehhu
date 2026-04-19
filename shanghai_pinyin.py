@@ -5,13 +5,14 @@
 输入汉字序列，输出每个字对应的：
     (1) IPA
     (2) T拼（Tastror 拼音方案）
-    (3) 吴学（通用吴语拼音-上海话）
+    (3) 吴学（吴语学堂拼音方案）
+    (4) 吴协（吴语协会拼音方案）
 
-数据来源：https://www.wugniu.com （字音查詢 → 上海閒話）
+数据来源：https://www.wugniu.com （吴学字音查詢）
 
 工作原理
 --------
-wugniu.com 把 IPA / 吳拼 列渲染成 SVG 反爬，但每一行结果里的音频文件名
+wugniu.com 把 IPA / 吳拼（吴学） 列渲染成 SVG 反爬，但每一行结果里的音频文件名
 （如 ``zy6.mp3``、``gniq8.mp3``）正是该字在「通用吴语拼音-上海话」下的拼写，
 因此只要抓下音频文件名，再按对照表转换就能得到三种写法。
 
@@ -52,6 +53,9 @@ INITIAL_MAP: dict[str, tuple[str, str]] = {
     'd':   ('dh', 'd'),
     'n':   ('n',  'n'),
     'l':   ('l',  'l'),
+    # 日/娘母腭化鼻音 /ɲ/（wugniu 用 gn-，MD 未直接列出；T拼用 n- 记，
+    # 实际腭化由后接的 i-介音体现）
+    'gn':  ('n',  'ɲ'),
     'ts':  ('z',  'ts'),
     'tsh': ('c',  'tsʰ'),
     's':   ('s',  's'),
@@ -67,9 +71,6 @@ INITIAL_MAP: dict[str, tuple[str, str]] = {
     'ng':  ('ng', 'ŋ'),
     'h':   ('h',  'h'),
     'gh':  ("'",  'ɦ'),
-    # 日/娘母腭化鼻音 /ɲ/（wugniu 用 gn-，MD 未直接列出；T拼用 n- 记，
-    # 实际腭化由后接的 i-介音体现）
-    'gn':  ('n',  'ɲ'),
     '':    ('',   ''),  # 零声母（影母）
 }
 
@@ -93,20 +94,20 @@ FINAL_MAP: dict[str, tuple[str, str]] = {
     'e':   ('ê',  'ɛ'),
     'au':  ('o',  'ɔ'),
     'eu':  ('eu', 'ɤ'),
-    'ae':  ('oe', 'ø'),
+    'oe':  ('oe', 'ø'),
     # 鼻尾韵
     'an':  ('an',  'ã'),
     'aon': ('aan', 'ɑ̃'),
     'on':  ('ong', 'oŋ'),
     'en':  ('en',  'ən'),
     'in':  ('in',  'ɪɲ'),
-    'iuin':('üin', 'yɪɲ'),
-    # 入声（MD 形式：h 结尾）
-    'ah':  ('aq',  'aʔ'),
-    'eh':  ('eq',  'əʔ'),
-    'oh':  ('oq',  'oʔ'),
-    'ih':  ('iq',  'iɪʔ'),
-    'iuih':('üiq', 'yɪʔ'),
+    'iun': ('üin', 'yɪɲ'),
+    # 入声
+    'aq':  ('aq',  'aʔ'),
+    'eq':  ('eq',  'əʔ'),
+    'oq':  ('oq',  'oʔ'),
+    'iq':  ('iq',  'iɪʔ'),
+    'iuq': ('üiq', 'yɪʔ'),
     # 自成音节
     'er':  ('er', 'əɻ'),
     'm':   ('m',  'm̩'),
@@ -313,6 +314,87 @@ def to_ipa_digit(initial: str, medial: str, final: str, tone: str) -> str:
     return unicodedata.normalize('NFC', ini_i + med_i + fin_i + digit)
 
 
+# =============================================================================
+# 吴协（吴语协会拼音方案）转写
+# =============================================================================
+#
+# 吴协 与 吴学 / 本程序内部规范形式的差异（见 ``上海闲话.md``）：
+#
+# * 声母：娘母 ``gn`` 写作 ``ny``；其余与吴学一致。
+# * 韵母差异（内部规范形式用吴学写法，此处映射到吴协写法）：
+#       aq → ah、eq → eh、oq → oh、iq → ih、iuq → iuih
+#       iun → iuin、oe → ae、er → r
+# * y/w 简写规则同吴学。
+# * 声调使用汉字后标 平/上/去/入（正字法滞古，阴阳由声母清浊区分）：
+#       阴平 / 阳平 → 平（调值 52 / 23）
+#       阴上去 → 上/去
+#       阳平上去 → 平/上/去
+#       阴入 / 阳入 → 入
+#   由于本程序已把阴上/阴去合并为 5、阳平/上/去 合并为 6，
+#   无法恢复 平/上/去 区分，所以 5、6 直接标出歧义（"上/去" / "平/上/去"）。
+
+# 声调：吴学 tone key -> 吴协 后标（汉字）
+_TONE_DIGIT_WUXIE: dict[str, str] = {
+    '1': '平',
+    '5': '上/去',
+    '6': '平/上/去',
+    '7': '入',
+    '8': '入',
+}
+
+# 内部（吴学）韵母 -> 吴协 韵母
+_FINAL_WUXIE: dict[str, str] = {
+    'aq':  'ah',
+    'eq':  'eh',
+    'oq':  'oh',
+    'iq':  'ih',
+    'iuq': 'iuih',
+    'iun': 'iuin',
+    'oe':  'ae',
+    'er':  'r',
+}
+
+
+def _compose_wuxie(initial: str, medial: str, final: str) -> str:
+    """把 (声母, 介音, 韵母) 按吴协写法组合成拼写字符串（不含声调）。"""
+    # 把内部（吴学）韵母翻译到吴协写法
+    fin = _FINAL_WUXIE.get(final, final)
+
+    # 成音节韵母
+    if initial == '' and medial == '' and fin in {'m', 'n', 'ng', 'r'}:
+        return fin
+    if initial == 'h' and fin in {'m', 'n', 'ng'}:
+        return 'h' + fin
+    if initial == 'gn':
+        return 'ny' + medial + fin
+
+    if initial == 'gh':
+        # 同吴学 y/w 简写规则
+        if medial == '' and fin.startswith('iu'):
+            return 'y' + fin[1:]
+        if medial == 'i':
+            return 'y' + fin
+        if medial == 'iu':
+            return 'y' + 'u' + fin
+        if medial == '' and fin == 'i':
+            return 'yi'
+        if medial == '' and fin.startswith('i'):
+            return 'y' + fin
+        if medial == 'u':
+            return 'w' + fin
+        if medial == '' and fin == 'u':
+            return 'wu'
+        if medial == '' and fin.startswith('u'):
+            return 'w' + fin[1:]
+    return initial + medial + fin
+
+
+def to_wuxie(initial: str, medial: str, final: str, tone: str) -> str:
+    """吴协（吴语协会拼音）字符串。"""
+    body = _compose_wuxie(initial, medial, final)
+    return body + _TONE_DIGIT_WUXIE.get(tone, tone)
+
+
 # 反向索引：IPA(数字调号) → (initial, medial, final, tone)。一次性构造。
 _IPA_DIGIT_INDEX: dict[str, tuple[str, str, str, str]] = {}
 
@@ -323,7 +405,7 @@ def _build_ipa_index() -> None:
             for fin in FINAL_MAP:
                 for tone in TONE_MAP:
                     # 过滤掉声调与韵类不匹配的组合：入声只配 7/8、非入声只配 1/5/6
-                    is_ru = fin in {'ah', 'eh', 'oh', 'ih', 'iuih'}
+                    is_ru = fin in {'aq', 'eq', 'oq', 'iq', 'iuq'}
                     if is_ru and tone not in {'7', '8'}:
                         continue
                     if (not is_ru) and tone in {'7', '8'}:
@@ -472,6 +554,7 @@ def _view_from_entry(entry: dict, ch: str) -> dict:
             'variants': variants,
             'raw': '',
             'tongwushang': '（暂空）',
+            'wuxie': '（暂空）',
             'tpin': '（暂空）',
             'ipa': '（暂空）',
             'ipa_digit': None,
@@ -485,6 +568,7 @@ def _view_from_entry(entry: dict, ch: str) -> dict:
             'variants': variants,
             'raw': ipa_digit,
             'tongwushang': '?',
+            'wuxie': '?',
             'tpin': '?',
             'ipa': ipa_digit,
             'ipa_digit': ipa_digit,
@@ -497,6 +581,7 @@ def _view_from_entry(entry: dict, ch: str) -> dict:
         'variants': variants,
         'raw': canon,
         'tongwushang': canon,
+        'wuxie': to_wuxie(ini, med, fin, tone),
         'tpin': to_tpin(ini, med, fin, tone),
         'ipa': to_ipa(ini, med, fin, tone),
         'ipa_digit': ipa_digit,
@@ -524,6 +609,7 @@ def query_character(ch: str, *, force_refresh: bool = False) -> list[dict]:
                     'variants': [ch],
                     'raw': '',
                     'tongwushang': '（暂空）',
+                    'wuxie': '（暂空）',
                     'tpin': '（暂空）',
                     'ipa': '（暂空）',
                     'ipa_digit': None,
@@ -567,6 +653,7 @@ def query_character(ch: str, *, force_refresh: bool = False) -> list[dict]:
             'variants': [ch],
             'raw': '',
             'tongwushang': '（暂空）',
+            'wuxie': '（暂空）',
             'tpin': '（暂空）',
             'ipa': '（暂空）',
             'ipa_digit': None,
@@ -659,7 +746,7 @@ def _pick_font(preferred: list[str], fallback: str = 'TkDefaultFont') -> str:
 class App:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
-        root.title('上海闲话字音查询  ·  IPA / T拼 / 吴学')
+        root.title('上海闲话字音查询  ·  IPA / T拼 / 吴学 / 吴协')
         root.geometry('960x720')
         try:
             root.configure(bg='#fafafa')
@@ -739,7 +826,9 @@ class App:
                                   font=(self.f_ipa, 14))
         self.output.tag_configure('tpin', foreground='#a34700',
                                   font=(self.f_ipa, 14))
-        self.output.tag_configure('twu', foreground='#2f7d32',
+        self.output.tag_configure('wxue', foreground='#2f7d32',
+                                  font=(self.f_ipa, 14))
+        self.output.tag_configure('wxie', foreground='#6a3fa0',
                                   font=(self.f_ipa, 14))
         self.output.tag_configure('note', foreground='#666',
                                   font=(self.f_cjk, 11, 'italic'))
@@ -844,12 +933,16 @@ class App:
                 self._append('（暂空）', 'todo')
                 self._append('   吴学 ', 'label')
                 self._append('（暂空）', 'todo')
+                self._append('   吴协 ', 'label')
+                self._append('（暂空）', 'todo')
             else:
                 self._append(f'[{r["ipa"]}]', 'ipa')
                 self._append('   T拼 ', 'label')
                 self._append(r['tpin'], 'tpin')
                 self._append('   吴学 ', 'label')
-                self._append(r['tongwushang'], 'twu')
+                self._append(r['tongwushang'], 'wxue')
+                self._append('   吴协 ', 'label')
+                self._append(r['wuxie'], 'wxie')
             if r['note']:
                 self._append(f'   — {r["note"]}', 'note')
             self._append('\n')
@@ -876,8 +969,8 @@ def _selftest() -> None:
                 print(f'  暂空（note={r["note"]!r}）{vtag}')
                 continue
             print(
-                f'  吴学 {r["tongwushang"]:<10}  T拼 {r["tpin"]:<10}  '
-                f'IPA [{r["ipa"]}]{vtag}  備註 {r["note"]!r}'
+                f'  吴学 {r["tongwushang"]:<10}  吴协 {r["wuxie"]:<10}  '
+                f'T拼 {r["tpin"]:<10}  IPA [{r["ipa"]}]{vtag}  備註 {r["note"]!r}'
             )
 
 
