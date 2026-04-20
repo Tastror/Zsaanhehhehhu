@@ -951,7 +951,14 @@ class App:
     def _open_cache_dir(self) -> None:
         try:
             import os
-            os.startfile(CACHE_PATH.parent)  # type: ignore[attr-defined]
+            import subprocess
+            path = str(CACHE_PATH.parent)
+            if sys.platform == 'win32':
+                os.startfile(path)  # type: ignore[attr-defined]
+            elif sys.platform == 'darwin':
+                subprocess.Popen(['open', path])
+            else:
+                subprocess.Popen(['xdg-open', path])
         except Exception as exc:
             self._append(f'无法打开缓存目录：{exc}\n', 'error')
 
