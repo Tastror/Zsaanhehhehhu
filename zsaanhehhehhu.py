@@ -762,10 +762,13 @@ def _pick_font(preferred: list[str], fallback: str = 'TkDefaultFont') -> str:
 
 
 class App:
-    def __init__(self, root: tk.Tk) -> None:
+    def __init__(self, root: tk.Tk, dpi_scale: float = 1.0) -> None:
         self.root = root
+        self.dpi_scale = dpi_scale if dpi_scale and dpi_scale > 0 else 1.0
         root.title('上海闲话字音查询  ·  IPA / T拼 / 吴学 / 吴协')
-        root.geometry('960x720')
+        # 窗口几何尺寸按实际 DPI 倍率放大，否则高 DPI 下窗口会显得过小
+        base_w, base_h = 960, 720
+        root.geometry(f'{int(base_w * self.dpi_scale)}x{int(base_h * self.dpi_scale)}')
         try:
             root.configure(bg='#fafafa')
         except tk.TclError:
@@ -1378,6 +1381,75 @@ def _testhanzi(verbose: bool = True) -> None:
     print(f'\n共 {total} 个表层音节，{found} 有本地字例 / {total - found} 无字例')
 
 
+def _enable_dpi_awareness_and_get_scale() -> float:
+    """Windows：在 ``tk.Tk()`` 之前把进程标记为 DPI-aware，并返回实际缩放倍数
+    （1.0 / 1.25 / 1.5 / 2.0 …）。非 Windows 返回 1.0。
+
+    依次尝试 Per-Monitor v2（Win10 1703+）→ Per-Monitor v1（Win 8.1+）→ System。
+    **必须**显式给 ``SetProcessDpiAwarenessContext`` 设置 ``argtypes``，否则
+    64-bit 下 -4 会被 ctypes 按 c_int 截断传入，函数静默返回 FALSE，DPI
+    感知其实并未生效——这是"明明调了还是糊"的典型坑。
+    """
+    if not sys.platform.startswith('win'):
+        return 1.0
+    try:
+        import ctypes
+    except ImportError:
+        return 1.0
+    try:
+        succeeded = False
+
+        # v2：SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4)
+        # 必须用 pointer-sized 整数（c_ssize_t）传参。
+        try:
+            fn = ctypes.windll.user32.SetProcessDpiAwarenessContext
+            fn.argtypes = [ctypes.c_ssize_t]
+            fn.restype = ctypes.c_int
+            if fn(-4) != 0:  # BOOL 非零 = 成功
+                succeeded = True
+        except (AttributeError, OSError):
+            pass
+
+        # v1 Per-Monitor（Win 8.1+）：HRESULT；S_OK=0 或 E_ACCESSDENIED 视作成功
+        if not succeeded:
+            try:
+                fn = ctypes.windll.shcore.SetProcessDpiAwareness
+                fn.argtypes = [ctypes.c_int]
+                fn.restype = ctypes.c_long
+                hr = fn(2)  # PROCESS_PER_MONITOR_DPI_AWARE
+                if hr == 0 or hr == -2147024891:
+                    succeeded = True
+            except (AttributeError, OSError):
+                pass
+
+        # System DPI Aware（Vista+）兜底
+        if not succeeded:
+            try:
+                ctypes.windll.user32.SetProcessDPIAware()
+            except (AttributeError, OSError):
+                pass
+
+        # 主显示器 DPI
+        hdc = ctypes.windll.user32.GetDC(0)
+        dpi = ctypes.windll.gdi32.GetDeviceCaps(hdc, 88)  # LOGPIXELSX
+        ctypes.windll.user32.ReleaseDC(0, hdc)
+        return max(1.0, dpi / 96.0)
+    except Exception:
+        return 1.0
+
+
+def _apply_tk_scaling(root: tk.Tk, dpi_scale: float) -> None:
+    """把 Tk 的 point→pixel 换算与真实 DPI 对齐。
+
+    96 DPI 对应 Tk 默认 scaling = 96/72 ≈ 1.333；150% 下应为 1.333 × 1.5 = 2.0。
+    这样以 **点** 为单位声明的字号（如 14pt）才会被画成正确的物理像素数。
+    """
+    try:
+        root.tk.call('tk', 'scaling', 96.0 / 72.0 * dpi_scale)
+    except tk.TclError:
+        pass
+
+
 def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == '--testphonology':
         _testphonology()
@@ -1392,8 +1464,10 @@ def main() -> None:
         else:
             print(f'{CACHE_PATH} 不存在')
         return
+    dpi_scale = _enable_dpi_awareness_and_get_scale()
     root = tk.Tk()
-    App(root)
+    _apply_tk_scaling(root, dpi_scale)
+    App(root, dpi_scale=dpi_scale)
     root.mainloop()
 
 
