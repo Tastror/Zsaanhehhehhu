@@ -2,25 +2,25 @@
 plot_grid.py
 ============
 
-画一张 声母 × 韵母 的"热力格子图"。
+画 声母 × 韵母 的"热力格子图"。
 
-横轴：韵母（按吴学记号，顺序与 ``analyze.py`` 一致）
-纵轴：声母（按吴学记号）
+内部坐标：IPA 声母 × IPA 介音 × IPA 韵母。
+图上坐标：T拼 声母 × T拼 韵母（顺序与 ``analyze.py`` 一致）
 每个介音（Ø / i / u）一个子图。
 
 颜色：
 
 * 灰色 —— 被 ``zsaanhehhehhu._is_sensible_combo`` 判为不合法（系统性驱逐）
-* 绿色 —— 规则合法、且 ``syllable_coverage.json`` 里至少有一个声调下有字；
+* 绿色 —— 规则合法、且 ``readings.json`` 里至少有一个声调下有字；
   颜色深浅随该 (声母, 介音, 韵母) 下**汉字总数**（跨声调求和）
   以对数刻度渐变：字越多越深。
 * 红色 —— 规则合法，但数据里任何声调都没字（系统内空洞）
 
 用法::
 
-    python legacy/plot_grid.py                       # 保存 PNG
-    python legacy/plot_grid.py --show                # 交互弹窗
-    python legacy/plot_grid.py -o custom_path.png    # 自定义输出路径
+    python analyze/plot_grid.py                      # 保存总图 PNG + 5 张分声调 PNG
+    python analyze/plot_grid.py --show               # 交互弹窗
+    python analyze/plot_grid.py -o custom_path.png   # 自定义输出路径
 """
 
 from __future__ import annotations
@@ -44,49 +44,80 @@ import numpy as np  # noqa: E402
 import zsaanhehhehhu as sp  # noqa: E402
 
 
-COVERAGE_PATH = _HERE / 'syllable_coverage.json'
+READINGS_PATH = _ROOT / 'readings.json'
 DEFAULT_OUTPUT = _HERE / 'phonology_grid.png'
 DEFAULT_TXT_OUTPUT = _HERE / 'phonology_grid.txt'
 
 # 顺序取自 analyze.py / 上海闲话.md 的典型编排
 INITIALS = [
-    'p', 'ph', 'b', 'm', 'f', 'v',
-    't', 'th', 'd', 'n', 'gn', 'l',
-    'ts', 'tsh', 's', 'z',
-    'c', 'ch', 'j', 'sh', 'zh',
-    'k', 'kh', 'g', 'ng', 'h', 'gh',
+    'p', 'pʰ', 'b', 'm', 'f', 'v',
+    't', 'tʰ', 'd', 'n', 'ɲ', 'l',
+    'ts', 'tsʰ', 's', 'z',
+    'tɕ', 'tɕʰ', 'dʑ', 'ɕ', 'ʑ',
+    'k', 'kʰ', 'ɡ', 'ŋ', 'h', 'ɦ',
     '',
 ]
 FINALS = [
-    'a', 'e', 'oe',
-    'au', 'eu', 'o', 'u',
-    'i', 'iu', 'y',
-    'an', 'aon', 'en', 'on', 'in', 'iun',
-    'aq', 'eq', 'oq', 'iq', 'iuq',
-    'er', 'm', 'n', 'ng',
+    'a', 'ɛ', 'ø',
+    'ɔ', 'ɤ', 'o', 'u',
+    'i', 'y', 'ɿ',
+    'ã', 'ɑ̃', 'ən', 'oŋ', 'ɪɲ', 'yɪɲ',
+    'aʔ', 'əʔ', 'oʔ', 'iɪʔ', 'yɪʔ',
+    'əɻ', 'm̩', 'n̩', 'ŋ̍',
 ]
-MEDIALS = ['', 'i', 'u']
+MEDIALS = ['', 'j', 'w']
+TONES = list(sp.TONE_MAP)
+RU_FINALS = {'aʔ', 'əʔ', 'oʔ', 'iɪʔ', 'yɪʔ'}
+TONE_LABELS = {
+    '1': '1 阴平',
+    '5': '5 阴去',
+    '6': '6 阳去',
+    '7': '7 阴入',
+    '8': '8 阳入',
+}
+
+_WX_INITIAL_BY_IPA = {ipa: wx for wx, (_tp, ipa) in sp.INITIAL_MAP.items()}
+_WX_MEDIAL_BY_IPA = {ipa: wx for wx, (_tp, ipa) in sp.MEDIAL_MAP.items()}
+_WX_FINAL_BY_IPA = {ipa: wx for wx, (_tp, ipa) in sp.FINAL_MAP.items()}
+
+
+def _parts_to_ipa(combo: tuple[str, str, str, str]) -> tuple[str, str, str, str]:
+    ini, med, fin, tone = combo
+    return (
+        sp.INITIAL_MAP[ini][1],
+        sp.MEDIAL_MAP[med][1],
+        sp.FINAL_MAP[fin][1],
+        tone,
+    )
+
+
+def _to_wx_parts(ini: str, med: str, fin: str) -> tuple[str, str, str]:
+    return (
+        _WX_INITIAL_BY_IPA[ini],
+        _WX_MEDIAL_BY_IPA[med],
+        _WX_FINAL_BY_IPA[fin],
+    )
 
 
 # 坐标轴显示：T拼 标签。
-# 注意：吴学 `n`(南) 和 `gn`(娘) 在 T拼 下都写作 `n`，故分别标注 `n(南)` / `n(娘)`
+# 注意：IPA `n`(南) 和 `ɲ`(娘) 在 T拼 下都写作 `n`，故分别标注 `n(南)` / `n(娘)`
 # 以免 Y 轴两行重名；`Ø` 代表零声母 / 空介音。
 def _ini_tpin_label(ini: str) -> str:
     if ini == '':
         return 'Ø'
     if ini == 'n':
         return 'n(南)'
-    if ini == 'gn':
+    if ini == 'ɲ':
         return 'n(娘)'
-    return sp.INITIAL_MAP[ini][0]
+    return sp.INITIAL_MAP[_WX_INITIAL_BY_IPA[ini]][0]
 
 
 def _fin_tpin_label(fin: str) -> str:
-    return sp.FINAL_MAP[fin][0]
+    return sp.FINAL_MAP[_WX_FINAL_BY_IPA[fin]][0]
 
 
 def _med_tpin_label(med: str) -> str:
-    return 'Ø' if med == '' else sp.MEDIAL_MAP[med][0]
+    return 'Ø' if med == '' else sp.MEDIAL_MAP[_WX_MEDIAL_BY_IPA[med]][0]
 
 
 # 三种状态
@@ -107,33 +138,79 @@ def _pretty(sym: str) -> str:
     return 'Ø' if sym == '' else sym
 
 
-def load_char_counts() -> dict[tuple[str, str, str], int]:
-    """从 syllable_coverage.json 读出 (ini, med, fin) 下跨声调的汉字总数。"""
-    data = json.loads(COVERAGE_PATH.read_text(encoding='utf-8'))
-    out: dict[tuple[str, str, str], int] = {}
-    for wx, info in data.items():
-        parsed = sp.parse_syllable(wx)
-        if not parsed:
+def _entry_chars(ch: str, entry: dict) -> set[str]:
+    """返回一个 readings.json 条目代表的字形集合，用于去重计数。"""
+    variants = entry.get('variants')
+    if isinstance(variants, list):
+        chars = {str(v) for v in variants if v}
+        if chars:
+            return chars
+    return {ch}
+
+
+def load_char_counts() -> tuple[
+    dict[tuple[str, str, str], int],
+    dict[str, dict[tuple[str, str, str], int]],
+]:
+    """从 readings.json 读出总计数，以及每个声调的 IPA (ini, med, fin) 汉字数。"""
+    data = json.loads(READINGS_PATH.read_text(encoding='utf-8'))
+    total_sets: dict[tuple[str, str, str], set[str]] = {}
+    tone_sets: dict[str, dict[tuple[str, str, str], set[str]]] = {
+        tone: {} for tone in TONES
+    }
+
+    for ch, entries in data.items():
+        if not isinstance(ch, str) or not isinstance(entries, list):
             continue
-        _canon, ini, med, fin, _tone = parsed
-        if not isinstance(info, dict):
-            continue
-        cnt = int(info.get('count', 0) or 0)
-        if cnt <= 0:
-            continue
-        out[(ini, med, fin)] = out.get((ini, med, fin), 0) + cnt
-    return out
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            parts = sp.ipa_digit_to_parts(entry.get('ipa') or '')
+            if not parts:
+                continue
+            ini, med, fin, tone = _parts_to_ipa(parts)
+            chars = _entry_chars(ch, entry)
+            key = (ini, med, fin)
+            total_sets.setdefault(key, set()).update(chars)
+            if tone in tone_sets:
+                tone_sets[tone].setdefault(key, set()).update(chars)
+
+    totals = {key: len(chars) for key, chars in total_sets.items()}
+    by_tone = {
+        tone: {key: len(chars) for key, chars in counts.items()}
+        for tone, counts in tone_sets.items()
+    }
+    return totals, by_tone
+
+
+def _is_tone_sensible_combo(ini: str, med: str, fin: str, tone: str | None) -> bool:
+    """总图只看音系组合；分声调图额外灰掉声调/入声不兼容的格子。"""
+    wx_ini, wx_med, wx_fin = _to_wx_parts(ini, med, fin)
+    if not sp._is_sensible_combo(wx_ini, wx_med, wx_fin):
+        return False
+    if tone is None:
+        return True
+
+    is_ru = fin in RU_FINALS
+    if is_ru and tone not in {'7', '8'}:
+        return False
+    if (not is_ru) and tone in {'7', '8'}:
+        return False
+    return sp._is_tone_compatible_initial(wx_ini, tone, wx_med, wx_fin)
 
 
 def build_grid(
-    med: str, counts: dict[tuple[str, str, str], int]
+    med: str,
+    counts: dict[tuple[str, str, str], int],
+    *,
+    tone: str | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """返回 (状态网格, 字数网格)。字数仅在 STATE_FILLED 格上有意义。"""
     state = np.zeros((len(INITIALS), len(FINALS)), dtype=int)
     cgrid = np.zeros((len(INITIALS), len(FINALS)), dtype=int)
     for i, ini in enumerate(INITIALS):
         for j, fin in enumerate(FINALS):
-            if not sp._is_sensible_combo(ini, med, fin):
+            if not _is_tone_sensible_combo(ini, med, fin, tone):
                 state[i, j] = STATE_EXCLUDED
                 continue
             c = counts.get((ini, med, fin), 0)
@@ -195,8 +272,8 @@ _SYM_EMPTY    = 'x'   # 红：规则内无字
 def dump_txt(path: Path, counts: dict[tuple[str, str, str], int]) -> None:
     """把 3 张 声母 × 韵母 网格写成人类可读的 ASCII 表格（T拼 标签）。
 
-    绿色格子里填 (count) 以对应热力图的深浅；声母 `n(南)` / `n(娘)`
-    对应吴学 `n` / `gn`。
+    绿色格子里填 (count) 以对应热力图的深浅；内部使用 IPA，T拼的
+    `n(南)` / `n(娘)` 分别对应 IPA `n` / `ɲ`。
     """
     ini_labels = [_ini_tpin_label(i) for i in INITIALS]
     fin_labels = [_fin_tpin_label(f) for f in FINALS]
@@ -207,7 +284,7 @@ def dump_txt(path: Path, counts: dict[tuple[str, str, str], int]) -> None:
         f'数字 = 有字（绿，数字 = 汉字总数）   '
         f'{_SYM_EMPTY} = 规则内无字（红）'
     )
-    lines.append('标签：T拼（声母 n(南)=吴学 n，n(娘)=吴学 gn）。')
+    lines.append('标签：T拼（声母 n(南)=IPA n，n(娘)=IPA ɲ）。')
     lines.append('')
     col_w = max(max(len(f) for f in fin_labels), 3) + 1
     ini_w = max(len(s) for s in ini_labels)
@@ -220,7 +297,7 @@ def dump_txt(path: Path, counts: dict[tuple[str, str, str], int]) -> None:
         for ini, ini_label in zip(INITIALS, ini_labels):
             row_cells: list[str] = []
             for fin in FINALS:
-                if not sp._is_sensible_combo(ini, med, fin):
+                if not _is_tone_sensible_combo(ini, med, fin, None):
                     row_cells.append(_SYM_EXCLUDED)
                     n_excl += 1
                 else:
@@ -246,7 +323,7 @@ def dump_txt(path: Path, counts: dict[tuple[str, str, str], int]) -> None:
         for med in MEDIALS:
             for fin in FINALS:
                 if (
-                    sp._is_sensible_combo(ini, med, fin)
+                    _is_tone_sensible_combo(ini, med, fin, None)
                     and counts.get((ini, med, fin), 0) == 0
                 ):
                     triples_by_im.setdefault((ini, med), []).append(fin)
@@ -265,10 +342,15 @@ def dump_txt(path: Path, counts: dict[tuple[str, str, str], int]) -> None:
     print(f'已保存 txt 到 {path}')
 
 
-def plot(output: Path | None, show: bool) -> None:
+def _plot_one(
+    output: Path | None,
+    show: bool,
+    counts: dict[tuple[str, str, str], int],
+    *,
+    tone: str | None = None,
+) -> None:
     setup_cjk_font()
 
-    counts = load_char_counts()
     max_count = max(counts.values()) if counts else 1
 
     # 每个 med 一张格子：先算 state + cgrid，再组一张 RGBA 图。
@@ -284,7 +366,7 @@ def plot(output: Path | None, show: bool) -> None:
 
     stats = []
     for ax, med in zip(axes, MEDIALS):
-        state, cgrid = build_grid(med, counts)
+        state, cgrid = build_grid(med, counts, tone=tone)
         rgba = np.zeros((len(INITIALS), len(FINALS), 4), dtype=float)
         for i in range(len(INITIALS)):
             for j in range(len(FINALS)):
@@ -341,15 +423,19 @@ def plot(output: Path | None, show: bool) -> None:
 
     axes[0].set_ylabel('声母（T拼）')
 
+    excluded_label = '规则排除（灰）' if tone is None else '规则/声调排除（灰）'
+    filled_light_label = '有字（浅绿 = 1 字）'
+    filled_dark_label = f'有字（深绿 = {max_count} 字，log 刻度）'
+    empty_label = '规则内无字（红）' if tone is None else '本声调规则内无字（红）'
     legend_handles = [
         Patch(facecolor=COLOR_EXCLUDED, edgecolor='black', linewidth=0.3,
-              label='规则排除（灰）'),
+              label=excluded_label),
         Patch(facecolor=COLOR_FILLED_LIGHT, edgecolor='black', linewidth=0.3,
-              label=f'有字（浅绿 = 1 字）'),
+              label=filled_light_label),
         Patch(facecolor=COLOR_FILLED_DARK, edgecolor='black', linewidth=0.3,
-              label=f'有字（深绿 = {max_count} 字，log 刻度）'),
+              label=filled_dark_label),
         Patch(facecolor=COLOR_EMPTY, edgecolor='black', linewidth=0.3,
-              label='规则内无字（红）'),
+              label=empty_label),
     ]
     fig.legend(handles=legend_handles, loc='lower center',
                ncol=4, frameon=False, bbox_to_anchor=(0.5, -0.02))
@@ -358,10 +444,14 @@ def plot(output: Path | None, show: bool) -> None:
         f'med={_med_tpin_label(m)}: 灰 {g}  绿 {f}  红 {e}'
         for (m, g, f, e) in stats
     ]
-    fig.suptitle(
-        '上海话音节结构热力图   |   ' + '    '.join(stat_lines),
-        fontsize=12,
-    )
+    if tone is None:
+        title = '上海话音节结构热力图   |   ' + '    '.join(stat_lines)
+    else:
+        title = (
+            f'上海话音节结构热力图（声调 {TONE_LABELS.get(tone, tone)}）'
+            '   |   ' + '    '.join(stat_lines)
+        )
+    fig.suptitle(title, fontsize=12)
 
     fig.tight_layout(rect=(0, 0.03, 1, 0.96))
 
@@ -373,33 +463,59 @@ def plot(output: Path | None, show: bool) -> None:
     plt.close(fig)
 
 
+def _tone_output_path(output: Path, tone: str) -> Path:
+    suffix = output.suffix or '.png'
+    return output.with_name(f'{output.stem}_tone{tone}{suffix}')
+
+
+def _optional_path(value: str) -> Path | None:
+    return None if value == '' else Path(value)
+
+
+def plot(output: Path | None, show: bool, *, tone_plots: bool = True) -> None:
+    total_counts, counts_by_tone = load_char_counts()
+
+    _plot_one(output=output, show=show, counts=total_counts)
+
+    if not tone_plots:
+        return
+    for tone in TONES:
+        tone_output = _tone_output_path(output, tone) if output is not None else None
+        _plot_one(
+            output=tone_output,
+            show=show,
+            counts=counts_by_tone.get(tone, {}),
+            tone=tone,
+        )
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[1] if __doc__ else '')
     parser.add_argument(
-        '-o', '--output', type=Path, default=DEFAULT_OUTPUT,
+        '-o', '--output', default=str(DEFAULT_OUTPUT),
         help=f'PNG 输出路径（默认 {DEFAULT_OUTPUT.name}）；传入空串则不保存。',
     )
     parser.add_argument(
-        '--txt', type=Path, default=DEFAULT_TXT_OUTPUT,
+        '--txt', default=str(DEFAULT_TXT_OUTPUT),
         help=f'TXT 输出路径（默认 {DEFAULT_TXT_OUTPUT.name}）；传入空串则不保存 txt。',
     )
     parser.add_argument(
         '--show', action='store_true', help='显示交互窗口（默认仅保存 PNG）。',
     )
+    parser.add_argument(
+        '--no-tone-plots', action='store_true',
+        help='只画总图，不额外保存 5 张分声调图。',
+    )
     args = parser.parse_args(argv)
 
-    output: Path | None = args.output
-    if output is not None and str(output) == '':
-        output = None
-
-    txt_output: Path | None = args.txt
-    if txt_output is not None and str(txt_output) == '':
-        txt_output = None
+    output = _optional_path(args.output)
+    txt_output = _optional_path(args.txt)
 
     if txt_output is not None:
-        dump_txt(txt_output, load_char_counts())
+        total_counts, _counts_by_tone = load_char_counts()
+        dump_txt(txt_output, total_counts)
 
-    plot(output=output, show=args.show)
+    plot(output=output, show=args.show, tone_plots=not args.no_tone_plots)
 
 
 if __name__ == '__main__':

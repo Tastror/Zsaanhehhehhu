@@ -1074,8 +1074,11 @@ _CLEAR_INITIALS: frozenset[str] = frozenset({
 _VOICED_INITIALS: frozenset[str] = frozenset({
     'b', 'd', 'z', 'j', 'g', 'v', 'zh', 'gh',
 })
-# 次浊（鼻音/边音/腭化鼻音）与零声母：阴阳皆可
-# _SONORANT_INITIALS = {'m', 'n', 'ng', 'l', 'gn'}
+# 次浊中的 m 与零声母：阴阳皆可；n/l/ng/gn 不带 5/7，唯 gnian5「仰」例外。
+_NASAL_LATERAL_NO_5_7: frozenset[str] = frozenset({'n', 'l', 'ng', 'gn'})
+_TONE_EXCEPTION_GNIAN5: tuple[str, str, str, str] = ('gn', 'i', 'an', '5')
+_RU_FINALS: frozenset[str] = frozenset({'aq', 'eq', 'oq', 'iq', 'iuq'})
+_SYLLABIC_FINALS: frozenset[str] = frozenset({'m', 'n', 'ng'})
 
 
 # =============================================================================
@@ -1118,7 +1121,7 @@ _GROUP_OF_INI: dict[str, int] = {
 
 # (声母组, 介音) → 允许韵母集合（吴学记号）。
 # 未列出的 (组, 介音) 表示该组在该介音下整体无字例 —— 系统级排除。
-# 条目依 ``legacy/group_grid.txt`` 归纳：组内只要有一个声母在此 (med, fin)
+# 条目依 ``analyze/group_grid.txt`` 归纳：组内只要有一个声母在此 (med, fin)
 # 下有字，此 fin 就进入允许集；组内全无字则不入集。
 _ALLOWED_FINS: dict[tuple[int, str], frozenset[str]] = {
     # -------- 介音 = Ø （空介音）--------
@@ -1197,11 +1200,27 @@ def _is_sensible_combo(ini: str, med: str, fin: str) -> bool:
     return True
 
 
-def _is_tone_compatible_initial(ini: str, tone: str) -> bool:
+def _is_tone_compatible_initial(
+    ini: str,
+    tone: str,
+    med: str = '',
+    fin: str = '',
+) -> bool:
     """阴阳调-声母 制约：清声母只配阴调、全浊只配阳调。
 
-    次浊（m/n/gn/l/ng）与零声母不受限制。
+    次浊里 m 与零声母不受限制；n/l/ng/gn 不配 5/7 调，唯 gnian5
+    「仰」保留为词汇特例。
     """
+    if (ini, med, fin, tone) == _TONE_EXCEPTION_GNIAN5:
+        return True
+    if ini == '':
+        if med == '' and fin in _SYLLABIC_FINALS:
+            return tone in {'1', '6'}
+        if fin in _RU_FINALS:
+            return tone == '7'
+        return tone in {'1', '5'}
+    if tone in {'5', '7'} and ini in _NASAL_LATERAL_NO_5_7:
+        return False
     if tone in {'1', '5', '7'} and ini in _VOICED_INITIALS:
         return False
     if tone in {'6', '8'} and ini in _CLEAR_INITIALS:
@@ -1249,7 +1268,6 @@ def _enumerate_canonical_syllables() -> tuple[
       * ``aliased``：非表层（同形但音系不成立）组合列表，每项是
         ``(原组合, 吴学写法, parse 结果)``。
     """
-    ru_finals = {'aq', 'eq', 'oq', 'iq', 'iuq'}
     canonical: list[_SyllableRow] = []
     aliased: list[tuple[tuple[str, str, str, str], str, object]] = []
 
@@ -1259,12 +1277,12 @@ def _enumerate_canonical_syllables() -> tuple[
                 if not _is_sensible_combo(ini, med, fin):
                     continue
                 for tone in TONE_MAP:
-                    is_ru = fin in ru_finals
+                    is_ru = fin in _RU_FINALS
                     if is_ru and tone not in {'7', '8'}:
                         continue
                     if (not is_ru) and tone in {'7', '8'}:
                         continue
-                    if not _is_tone_compatible_initial(ini, tone):
+                    if not _is_tone_compatible_initial(ini, tone, med, fin):
                         continue
 
                     wx = _compose_wxue(ini, med, fin) + tone
@@ -1357,7 +1375,7 @@ def _testhanzi(verbose: bool = True) -> None:
     missing_syllables: list[str] = []
 
     if verbose:
-        print(f'{"吴学":<12}{"吴协":<20}{"T拼":<14}{"IPA":<14}示例字')
+        print(f'{"IPA":<14}{"T拼":<14}{"吴学":<12}{"吴协":<20}示例字')
         print('-' * 90)
 
     max_examples = 5
@@ -1375,7 +1393,7 @@ def _testhanzi(verbose: bool = True) -> None:
             sample = '（无）'
             missing_syllables.append(wx)
         if verbose:
-            print(f'{wx:<12}{wxie:<20}{tp:<14}[{ipa}]'.ljust(74) + f'  {sample}')
+            print(f'{ipa:<14}{tp:<14}{wx:<12}{wxie:<20}'.ljust(74) + f'  {sample}')
 
     total = len(canonical)
     print(f'\n共 {total} 个表层音节，{found} 有本地字例 / {total - found} 无字例')
