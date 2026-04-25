@@ -29,7 +29,7 @@ import tkinter as tk
 import unicodedata
 import urllib.parse
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from pathlib import Path
 from threading import Lock, Thread
@@ -629,7 +629,12 @@ def _view_from_entry(entry: dict, ch: str) -> dict:
     }
 
 
-def query_character(ch: str, *, force_refresh: bool = False) -> list[dict]:
+def query_character(
+    ch: str,
+    *,
+    force_refresh: bool = False,
+    save_cache: bool = True,
+) -> list[dict]:
     """对单个汉字返回 reading 列表。
 
     流程：本地 JSON 缓存优先 → 未命中时抓 wugniu → 写回 JSON。
@@ -682,10 +687,11 @@ def query_character(ch: str, *, force_refresh: bool = False) -> list[dict]:
     # 写回缓存
     with _cache_lock:
         _cache[ch] = entries
-    try:
-        _save_cache()
-    except Exception as exc:
-        print(f'[warn] 写本地缓存失败：{exc}', file=sys.stderr)
+    if save_cache:
+        try:
+            _save_cache()
+        except Exception as exc:
+            print(f'[warn] 写本地缓存失败：{exc}', file=sys.stderr)
 
     if not entries:
         return [{
@@ -849,6 +855,10 @@ class App:
             command=self._toggle_tpin_mode,
         )
         self.tpin_mode_btn.pack(side='left', padx=6)
+        self.progress = ttk.Progressbar(
+            bar, mode='determinate', maximum=1, value=0, length=150,
+        )
+        self.progress.pack(side='left', padx=(8, 4))
         self.status = ttk.Label(bar, text='就绪', style='Status.TLabel')
         self.status.pack(side='left', padx=14)
 
@@ -896,7 +906,7 @@ class App:
 
         root.bind('<Control-Return>', lambda _e: self.on_query())
 
-        self._pool = ThreadPoolExecutor(max_workers=6)
+        self._pool = ThreadPoolExecutor(max_workers=12)
 
     # -- GUI helpers --------------------------------------------------------
 
@@ -947,16 +957,165 @@ class App:
         """Schedule a UI update onto the Tk main thread."""
         self.root.after(0, lambda: fn(*args, **kwargs))
 
+    def _set_controls_busy(self, busy: bool) -> None:
+        state = 'disabled' if busy else 'normal'
+        self.query_btn.configure(state=state)
+        self.refresh_btn.configure(state=state)
+        self.tpin_mode_btn.configure(state=state)
+
+    def _set_progress(self, current: int, total: int, text: str) -> None:
+        total = max(total, 1)
+        self.progress.configure(maximum=total, value=min(current, total))
+        self.status.configure(text=text)
+
+    def _finish_busy(self, text: str = '完成') -> None:
+        self.progress.configure(maximum=1, value=0)
+        self.status.configure(text=text)
+        self._set_controls_busy(False)
+
     def clear(self) -> None:
-        self.output.configure(state='normal')
-        self.output.delete('1.0', 'end')
-        self.output.configure(state='disabled')
+        self._insert_chunks([], clear=True, autoscroll=False)
 
     def _append(self, text: str, *tags: str) -> None:
+        self._insert_chunks([(text, tags)], autoscroll=True)
+
+    def _insert_chunks(
+        self,
+        chunks: list[tuple[str, tuple[str, ...]]],
+        *,
+        clear: bool = False,
+        autoscroll: bool = True,
+    ) -> None:
         self.output.configure(state='normal')
-        self.output.insert('end', text, tags if tags else None)
+        if clear:
+            self.output.delete('1.0', 'end')
+        for text, tags in chunks:
+            self.output.insert('end', text, tags if tags else None)
         self.output.configure(state='disabled')
-        self.output.see('end')
+        if autoscroll:
+            self.output.see('end')
+
+    def _char_chunks(
+        self,
+        idx: int,
+        ch: str,
+        readings: list[dict],
+    ) -> list[tuple[str, tuple[str, ...]]]:
+        chunks: list[tuple[str, tuple[str, ...]]] = [
+            (f'{idx}. ', ('section',)),
+            (ch, ('char',)),
+        ]
+        if not readings:
+            chunks.append(('   （未找到读音）\n\n', ('error',)))
+            return chunks
+        if 'error' in readings[0]:
+            chunks.append((f"   查询出错：{readings[0]['error']}\n\n", ('error',)))
+            return chunks
+
+        chunks.append((f'   共 {len(readings)} 个读音\n', ('meta',)))
+        for i, r in enumerate(readings, 1):
+            label = f'  [{i}]'
+            others = [v for v in r.get('variants', []) if v != ch]
+            if others:
+                label += f'（异体：{"/".join(others)}）'
+            chunks.extend([
+                (label + ' ', ('label',)),
+                ('IPA ', ('label',)),
+            ])
+            if r.get('placeholder'):
+                chunks.extend([
+                    ('（暂空）', ('todo',)),
+                    ('   T拼 ', ('label',)),
+                    ('（暂空）', ('todo',)),
+                    ('   吴学 ', ('label',)),
+                    ('（暂空）', ('todo',)),
+                    ('   吴协 ', ('label',)),
+                    ('（暂空）', ('todo',)),
+                ])
+            else:
+                tpin = r['tpin']
+                if self._tpin_compat:
+                    tpin = tpin_to_compat(tpin)
+                chunks.extend([
+                    (f'[{r["ipa"]}]', ('ipa',)),
+                    ('   T拼 ', ('label',)),
+                    (tpin, ('tpin',)),
+                    ('   吴学 ', ('label',)),
+                    (r['wxue'], ('wxue',)),
+                    ('   吴协 ', ('label',)),
+                    (r['wuxie'], ('wxie',)),
+                ])
+            if r['note']:
+                chunks.append((f'   — {r["note"]}', ('note',)))
+            chunks.append(('\n', ()))
+        chunks.append(('\n', ()))
+        return chunks
+
+    def _render_chunk_groups(
+        self,
+        groups: list[list[tuple[str, tuple[str, ...]]]],
+        *,
+        clear: bool,
+        status_prefix: str,
+        done_text: str,
+        autoscroll: bool = True,
+        scroll_pos: float | None = None,
+        scroll_index: str | None = None,
+        batch_size: int = 6,
+    ) -> None:
+        total = len(groups)
+        self._set_progress(0, max(total, 1), f'{status_prefix} 0/{total}')
+        if clear:
+            self.output.configure(state='normal')
+            self.output.delete('1.0', 'end')
+            self.output.configure(state='disabled')
+        if total == 0:
+            self._finish_busy(done_text)
+            return
+
+        def step(start: int = 0) -> None:
+            end = min(start + batch_size, total)
+            self.output.configure(state='normal')
+            for group in groups[start:end]:
+                for text, tags in group:
+                    self.output.insert('end', text, tags if tags else None)
+            self.output.configure(state='disabled')
+            self._set_progress(end, total, f'{status_prefix} {end}/{total}')
+            if end < total:
+                self.root.after(1, lambda: step(end))
+                return
+            if scroll_index is not None:
+                self.output.update_idletasks()
+                self.output.yview(scroll_index)
+            elif scroll_pos is not None:
+                self.output.update_idletasks()
+                self.output.yview_moveto(scroll_pos)
+            elif autoscroll:
+                self.output.see('end')
+            self._finish_busy(done_text)
+
+        step()
+
+    def _render_results(
+        self,
+        render_data: list[tuple[int, str, list[dict]]],
+        trailer: str | None,
+    ) -> None:
+        self._last_render_data = render_data
+        self._last_trailer = trailer
+        groups = [
+            self._char_chunks(idx, ch, readings)
+            for idx, ch, readings in render_data
+        ]
+        if trailer:
+            groups.append([(trailer, ('meta',))])
+        self._render_chunk_groups(
+            groups,
+            clear=True,
+            status_prefix='渲染',
+            done_text='完成',
+            autoscroll=True,
+        )
 
     # -- 查询 ---------------------------------------------------------------
 
@@ -964,11 +1123,8 @@ class App:
         text = self.entry.get('1.0', 'end').strip()
         if not text:
             return
-        self.query_btn.configure(state='disabled')
-        self.refresh_btn.configure(state='disabled')
-        self.status.configure(
-            text='强制查询中 …' if force else '查询中 …'
-        )
+        self._set_controls_busy(True)
+        self._set_progress(0, 1, '准备查询 …')
         self.clear()
         Thread(target=self._run, args=(text, force), daemon=True).start()
 
@@ -989,98 +1145,84 @@ class App:
     def _run(self, text: str, force: bool) -> None:
         try:
             order = [ch for ch in text if is_cjk(ch)]
+            if not order:
+                self._ui(self._render_results, [], '（未识别到汉字）\n')
+                return
             unique = list(dict.fromkeys(order))
+            _load_cache()
+            with _cache_lock:
+                needs_fetch = force or any(ch not in _cache for ch in unique)
             future_map = {
-                ch: self._pool.submit(query_character, ch, force_refresh=force)
+                self._pool.submit(query_character, ch, force_refresh=force, save_cache=False): ch
                 for ch in unique
             }
             results: dict[str, list[dict]] = {}
-            for ch, fut in future_map.items():
+            total = len(future_map)
+            self._ui(self._set_progress, 0, total, f'查询 0/{total}')
+            for done, fut in enumerate(as_completed(future_map), 1):
+                ch = future_map[fut]
                 results[ch] = fut.result()
+                self._ui(self._set_progress, done, total, f'查询 {done}/{total}')
+            if needs_fetch:
+                self._ui(self._set_progress, total, total, '写入缓存 …')
+                try:
+                    _save_cache()
+                except Exception as exc:
+                    print(f'[warn] 写本地缓存失败：{exc}', file=sys.stderr)
             render_data = [(i, ch, results[ch]) for i, ch in enumerate(order, 1)]
-            for idx, ch, rs in render_data:
-                self._ui(self._print_char, idx, ch, rs)
-            if not order:
-                self._ui(self._append, '（未识别到汉字）\n', 'error')
-                trailer = None
-            else:
-                trailer = (
-                    f'\n本地缓存文件：{CACHE_PATH}\n'
-                    f'（「暂空」条目可手动编辑该文件中的 "ipa" 字段后再查询）\n'
-                )
-                self._ui(self._append, trailer, 'meta')
-            # 保存本次渲染数据，切换 T拼 表示时可直接重绘
-            self._last_render_data = render_data
-            self._last_trailer = trailer
+            trailer = (
+                f'\n本地缓存文件：{CACHE_PATH}\n'
+                f'（「暂空」条目可手动编辑该文件中的 "ipa" 字段后再查询）\n'
+            )
+            self._ui(self._render_results, render_data, trailer)
         except Exception as exc:
             self._ui(self._append, f'查询异常：{type(exc).__name__}: {exc}\n', 'error')
-        finally:
-            self._ui(self.status.configure, text='完成')
-            self._ui(self.query_btn.configure, state='normal')
-            self._ui(self.refresh_btn.configure, state='normal')
+            self._ui(self._finish_busy, '出错')
 
     # -- T拼 表示切换 -------------------------------------------------------
 
     def _toggle_tpin_mode(self) -> None:
+        if not self._last_render_data:
+            return
         scroll_pos = self.output.yview()[0]
+        scroll_index = self.output.index('@0,0')
+        self._set_controls_busy(True)
+        self._set_progress(0, 1, '切换 T拼表示 …')
         self._tpin_compat = not self._tpin_compat
         self.tpin_mode_btn.configure(
             text='当前：T拼兼容表示' if self._tpin_compat else '当前：T拼规范表示'
         )
-        self._rerender_last(scroll_pos=scroll_pos)
+        self.root.after(1, lambda: self._rerender_last(
+            scroll_pos=scroll_pos,
+            scroll_index=scroll_index,
+        ))
 
-    def _rerender_last(self, scroll_pos: float | None = None) -> None:
+    def _rerender_last(
+        self,
+        scroll_pos: float | None = None,
+        scroll_index: str | None = None,
+    ) -> None:
         if not self._last_render_data:
+            self._finish_busy('完成')
             return
-        self.clear()
-        for idx, ch, rs in self._last_render_data:
-            self._print_char(idx, ch, rs)
+        groups = [
+            self._char_chunks(idx, ch, readings)
+            for idx, ch, readings in self._last_render_data
+        ]
         if self._last_trailer:
-            self._append(self._last_trailer, 'meta')
-        if scroll_pos is not None:
-            self.output.update_idletasks()
-            self.output.yview_moveto(scroll_pos)
+            groups.append([(self._last_trailer, ('meta',))])
+        self._render_chunk_groups(
+            groups,
+            clear=True,
+            status_prefix='切换',
+            done_text='完成',
+            autoscroll=False,
+            scroll_pos=scroll_pos,
+            scroll_index=scroll_index,
+        )
 
     def _print_char(self, idx: int, ch: str, readings: list[dict]) -> None:
-        self._append(f'{idx}. ', 'section')
-        self._append(ch, 'char')
-        if not readings:
-            self._append('   （未找到读音）\n\n', 'error')
-            return
-        if 'error' in readings[0]:
-            self._append(f"   查询出错：{readings[0]['error']}\n\n", 'error')
-            return
-        self._append(f'   共 {len(readings)} 个读音\n', 'meta')
-        for i, r in enumerate(readings, 1):
-            label = f'  [{i}]'
-            others = [v for v in r.get('variants', []) if v != ch]
-            if others:
-                label += f'（异体：{"/".join(others)}）'
-            self._append(label + ' ', 'label')
-            self._append('IPA ', 'label')
-            if r.get('placeholder'):
-                self._append('（暂空）', 'todo')
-                self._append('   T拼 ', 'label')
-                self._append('（暂空）', 'todo')
-                self._append('   吴学 ', 'label')
-                self._append('（暂空）', 'todo')
-                self._append('   吴协 ', 'label')
-                self._append('（暂空）', 'todo')
-            else:
-                self._append(f'[{r["ipa"]}]', 'ipa')
-                self._append('   T拼 ', 'label')
-                tpin = r['tpin']
-                if self._tpin_compat:
-                    tpin = tpin_to_compat(tpin)
-                self._append(tpin, 'tpin')
-                self._append('   吴学 ', 'label')
-                self._append(r['wxue'], 'wxue')
-                self._append('   吴协 ', 'label')
-                self._append(r['wuxie'], 'wxie')
-            if r['note']:
-                self._append(f'   — {r["note"]}', 'note')
-            self._append('\n')
-        self._append('\n')
+        self._insert_chunks(self._char_chunks(idx, ch, readings), autoscroll=True)
 
 
 # =============================================================================
