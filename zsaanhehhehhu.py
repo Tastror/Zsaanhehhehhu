@@ -916,9 +916,9 @@ class App:
                                   font=(self.f_cjk, 12))
         self.output.tag_configure('ipa', foreground='#155fae',
                                   font=(self.f_ipa, 14))
-        self.output.tag_configure('tpin', foreground='#a34700',
+        self.output.tag_configure('tpin', foreground='#2f7d32',
                                   font=(self.f_ipa, 14))
-        self.output.tag_configure('wxue', foreground='#2f7d32',
+        self.output.tag_configure('wxue', foreground='#a34700',
                                   font=(self.f_ipa, 14))
         self.output.tag_configure('wxie', foreground='#6a3fa0',
                                   font=(self.f_ipa, 14))
