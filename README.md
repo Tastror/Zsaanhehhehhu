@@ -36,11 +36,7 @@ python analyze/group_analyze.py
 
 搜到以后存到本地 json，优先直接从本地读，不仅方便后续查询，也方便暂空的手动填补。
 
-> `readings.json` 已将 2026.4.20 前吴语学堂的所有繁体字与传承字保存完毕，且有部分简体字与异体字添加。
-
-## 搜索网站
-
-https://www.wugniu.com/search?char=搜索上海闲话&table=shanghai
+> `readings.json` 已将 2026.4.20 前吴语学堂 (<https://www.wugniu.com>) 的所有繁体字与传承字保存完毕，且有部分简体字与异体字或新字添加。
 
 ## 音标对照表
 
