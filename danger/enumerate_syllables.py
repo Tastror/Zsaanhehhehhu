@@ -2,7 +2,7 @@
 enumerate_syllables.py
 ======================
 
-枚举 ``zsaanhehhehhu._enumerate_canonical_syllables()`` 给出的 5000+ 个表层
+枚举 ``zsaanghehhehhu._enumerate_canonical_syllables()`` 给出的 5000+ 个表层
 合法音节，拿每个吴学拼音到 https://www.wugniu.com 反查对应字。用于摸清哪些
 音节在 wugniu 语料里实际没有字例，进而判断是否还有不合法的音系组合。
 
@@ -52,7 +52,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Event, Lock
 
-import zsaanhehhehhu as sp
+import zsaanghehhehhu as sp
 
 
 OUTPUT_PATH = Path(__file__).resolve().parent / 'syllable_coverage.json'

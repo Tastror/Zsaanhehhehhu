@@ -40,7 +40,7 @@ _ROOT = _HERE.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-import zsaanhehhehhu as sp  # noqa: E402
+import zsaanghehhehhu as sp  # noqa: E402
 
 
 READINGS_PATH = _ROOT / 'readings.json'

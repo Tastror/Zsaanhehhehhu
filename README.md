@@ -1,18 +1,18 @@
-# 上海闲话 Zsaanhehhehhu
+# 上海闲话 Zsaanghehhehhu
 
 ## 运行
 
 运行 GUI
 
 ```python
-python zsaanhehhehhu.py
+python zsaanghehhehhu.py
 ```
 
 查看所有可能音（包括偶然缺失）
 
 ```python
-python zsaanhehhehhu.py --testhanzi
-python zsaanhehhehhu.py --testphonology
+python zsaanghehhehhu.py --testhanzi
+python zsaanghehhehhu.py --testphonology
 ```
 
 ## 查看音系结构
