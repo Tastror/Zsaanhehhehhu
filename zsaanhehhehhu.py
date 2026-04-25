@@ -334,19 +334,46 @@ def to_ipa_digit(initial: str, medial: str, final: str, tone: str) -> str:
 # T拼 规范表示 ↔ 兼容表示（见 ``上海闲话.md``）：
 #   规范   兼容
 #    '  ↔  hh         （匣母浊喉擦 /ɦ/）
-#    ê  ↔  e          （海韵 /ɛ/；入声 iêq/üêq → ieq/üeq；
+#    ê  ↔  e          （海韵 /ɛ/；入声 iêq/üêq → ieq/yueq；
 #                      调号仍留，如 ề → è、ê̄ → ē、ế → é）
+#    ü  ↔  yu         （撮口韵；若 ü 带调，兼容写法调号标在 u 上，如 ǜ → yù）
 #
 # 反向（兼容 → 规范）有歧义（比如 `e` 是 ê 还是 `eu` 的一部分），但由于
 # 本工具渲染时总是从内部 (ini, med, fin, tone) 出发，只需要正向转换即可。
+def _replace_udiaeresis_with_yu(decomposed: str) -> str:
+    """在 NFD 文本中把 ``u + diaeresis`` 改为 ``yu``，其余调号保留在 u 上。"""
+    out: list[str] = []
+    i = 0
+    while i < len(decomposed):
+        ch = decomposed[i]
+        if ch == 'u':
+            j = i + 1
+            marks: list[str] = []
+            has_diaeresis = False
+            while j < len(decomposed) and unicodedata.combining(decomposed[j]):
+                if decomposed[j] == '\u0308':
+                    has_diaeresis = True
+                else:
+                    marks.append(decomposed[j])
+                j += 1
+            if has_diaeresis:
+                out.extend(['y', 'u', *marks])
+                i = j
+                continue
+        out.append(ch)
+        i += 1
+    return ''.join(out)
+
+
 def tpin_to_compat(tpin: str) -> str:
-    """把 T拼规范表示转成兼容表示：``'`` → ``hh``，``ê`` → ``e``，
-    因而 ``iêq``/``üêq`` 也会显示为 ``ieq``/``üeq``；
+    """把 T拼规范表示转成兼容表示：``'`` → ``hh``，``ê`` → ``e``，``ü`` → ``yu``，
+    因而 ``iêq``/``üêq`` 也会显示为 ``ieq``/``yueq``；
     同时保留声调组合变音符号（grave/macron/acute）。"""
-    # ê = e + U+0302。先分解到 NFD，去掉 U+0302（circumflex），再合回 NFC。
-    # 这样 ề (U+0065 U+0302 U+0300) → è，ê̄ → ē，ế → é，ê → e。
+    # 先分解到 NFD：ê = e + U+0302，ü = u + U+0308。
+    # 去掉 ê 的 U+0302 后，ề → è、ê̄ → ē、ế → é；ü 的其余调号留在 u 上。
     decomposed = unicodedata.normalize('NFD', tpin)
     decomposed = decomposed.replace('\u0302', '')
+    decomposed = _replace_udiaeresis_with_yu(decomposed)
     compat = unicodedata.normalize('NFC', decomposed)
     return compat.replace("'", 'hh')
 
@@ -848,7 +875,7 @@ class App:
             bar, text='打开缓存文件夹',
             command=self._open_cache_dir,
         ).pack(side='left', padx=6)
-        # T拼 表示切换（规范 ' / ê  ↔  兼容 hh / e）
+        # T拼 表示切换（规范 ' / ê / ü  ↔  兼容 hh / e / yu）
         self._tpin_compat: bool = False
         self.tpin_mode_btn = ttk.Button(
             bar, text='当前：T拼规范表示',
