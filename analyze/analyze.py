@@ -178,8 +178,8 @@ _INITIAL_ORDER = [
 _MEDIAL_ORDER = ['', 'j', 'w', 'ɥ']
 _FINAL_ORDER = [
     'a', 'o', 'i', 'ɿ', 'u', 'y', 'ɛ', 'ɔ', 'ɤ', 'ø',
-    'ã', 'ɑ̃', 'oŋ', 'ən', 'ɪɲ', 'yɪɲ',
-    'aʔ', 'əʔ', 'oʔ', 'iɪʔ', 'yɪʔ',
+    'ã', 'ɑ̃', 'oŋ', 'əŋ', 'iŋ', 'yiŋ',
+    'ᴀʔ', 'əʔ', 'oʔ', 'iɪʔ', 'yɪʔ',
     'əɻ', 'm̩', 'n̩', 'ŋ̍',
 ]
 _TONE_ORDER = ['1', '5', '6', '7', '8']
@@ -313,6 +313,7 @@ def main(argv: list[str] | None = None):
     a = analyze()
     text = format_report(a, residual_limit=None if args.limit == 0 else args.limit)
     args.output.write_text(text, encoding='utf-8')
+    print(f'已写入 {args.output}')
 
 
 if __name__ == '__main__':

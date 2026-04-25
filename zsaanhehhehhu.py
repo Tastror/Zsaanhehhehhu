@@ -98,16 +98,16 @@ FINAL_MAP: dict[str, tuple[str, str]] = {
     # 鼻尾韵
     'an':  ('an',  'ã'),
     'aon': ('aan', 'ɑ̃'),
-    'en':  ('en',  'ən'),
+    'en':  ('eng', 'əŋ'),
     'on':  ('ong', 'oŋ'),
-    'in':  ('in',  'ɪɲ'),
-    'iun': ('üin', 'yɪɲ'),
+    'in':  ('ing', 'iŋ'),
+    'iun': ('üing', 'yiŋ'),
     # 入声
-    'aq':  ('aq',  'aʔ'),
+    'aq':  ('aq',  'ᴀʔ'),
     'eq':  ('eq',  'əʔ'),
     'oq':  ('oq',  'oʔ'),
-    'iq':  ('iq',  'iɪʔ'),
-    'iuq': ('üiq', 'yɪʔ'),
+    'iq':  ('iêq', 'iɪʔ'),
+    'iuq': ('üêq', 'yɪʔ'),
     # 自成音节
     'er':  ('er', 'əɻ'),
     'm':   ('m',  'm̩'),
@@ -278,29 +278,47 @@ def _place_tone_tpin(text: str, tone: str) -> str:
     mark = TONE_MAP.get(tone, ('', '', ''))[0]
     if not mark or not text:
         return text
-    return text[0] + mark + text[1:]
+    tone_pos = text.index('ê') if text in {'iêq', 'üêq'} else 0
+    return text[:tone_pos + 1] + mark + text[tone_pos + 1:]
 
 
 def to_tpin(initial: str, medial: str, final: str, tone: str) -> str:
     """T拼（NFC 规范化，能预组合的字符都用 precomposed 形式）。
 
     例如 ``n + U+0300`` 会被合并为 ``ǹ``（U+01F9）；``ü + U+0301`` 合并为
-    ``ǘ``（U+01D8）。唯一例外是 ``ê`` 加 macron 的 ``ê̄``（阴去）——这个变体
-    本身没有预组合形式，只能保留 ``ê + U+0304``。
+    ``ǘ``（U+01D8）。``iêq`` / ``üêq`` 的调号标在 ``ê`` 上；
+    ``ê`` 加 macron 的 ``ê̄``（阴去）本身没有预组合形式，只能保留
+    ``ê + U+0304``。
     """
     ini_t, _ = INITIAL_MAP.get(initial, (initial, ''))
-    med_t, _ = MEDIAL_MAP.get(medial, (medial, ''))
-    fin_t, _ = FINAL_MAP.get(final, (final, ''))
-    # 声调标在韵母（不含介音）首字符上
+    med_t, fin_t = _tpin_medial_final(medial, final)
+    # 声调通常标在韵母（不含介音）首字符上；iêq/üêq 在 ê 上。
     fin_toned = _place_tone_tpin(fin_t, tone)
     return unicodedata.normalize('NFC', ini_t + med_t + fin_toned)
+
+
+def _tpin_medial_final(medial: str, final: str) -> tuple[str, str]:
+    """返回 T拼介音和韵母；``i + oe`` 内部仍按 i 计，显示为 ``üoe``。"""
+    med_t, _ = MEDIAL_MAP.get(medial, (medial, ''))
+    fin_t, _ = FINAL_MAP.get(final, (final, ''))
+    if medial == 'i' and final == 'oe':
+        return 'ü', fin_t
+    return med_t, fin_t
+
+
+def _ipa_medial_final(medial: str, final: str) -> tuple[str, str]:
+    """返回 IPA 介音和韵母；``i + oe`` 合写为 ``yø``。"""
+    _, med_i = MEDIAL_MAP.get(medial, ('', medial))
+    _, fin_i = FINAL_MAP.get(final, ('', final))
+    if medial == 'i' and final == 'oe':
+        return '', 'yø'
+    return med_i, fin_i
 
 
 def to_ipa(initial: str, medial: str, final: str, tone: str) -> str:
     """上标声调形式的 IPA（用于展示，NFC 规范化）。"""
     _, ini_i = INITIAL_MAP.get(initial, ('', initial))
-    _, med_i = MEDIAL_MAP.get(medial, ('', medial))
-    _, fin_i = FINAL_MAP.get(final, ('', final))
+    med_i, fin_i = _ipa_medial_final(medial, final)
     tone_i = TONE_MAP.get(tone, ('', '', ''))[1]
     return unicodedata.normalize('NFC', ini_i + med_i + fin_i + tone_i)
 
@@ -308,8 +326,7 @@ def to_ipa(initial: str, medial: str, final: str, tone: str) -> str:
 def to_ipa_digit(initial: str, medial: str, final: str, tone: str) -> str:
     """数字后标声调形式的 IPA（用于本地 JSON 存储；NFC 规范化）。"""
     _, ini_i = INITIAL_MAP.get(initial, ('', initial))
-    _, med_i = MEDIAL_MAP.get(medial, ('', medial))
-    _, fin_i = FINAL_MAP.get(final, ('', final))
+    med_i, fin_i = _ipa_medial_final(medial, final)
     digit = TONE_MAP.get(tone, ('', '', ''))[2]
     return unicodedata.normalize('NFC', ini_i + med_i + fin_i + digit)
 
@@ -317,13 +334,15 @@ def to_ipa_digit(initial: str, medial: str, final: str, tone: str) -> str:
 # T拼 规范表示 ↔ 兼容表示（见 ``上海闲话.md``）：
 #   规范   兼容
 #    '  ↔  hh         （匣母浊喉擦 /ɦ/）
-#    ê  ↔  e          （海韵 /ɛ/；调号仍留，如 ề → è、ê̄ → ē、ế → é）
+#    ê  ↔  e          （海韵 /ɛ/；入声 iêq/üêq → ieq/üeq；
+#                      调号仍留，如 ề → è、ê̄ → ē、ế → é）
 #
 # 反向（兼容 → 规范）有歧义（比如 `e` 是 ê 还是 `eu` 的一部分），但由于
 # 本工具渲染时总是从内部 (ini, med, fin, tone) 出发，只需要正向转换即可。
 def tpin_to_compat(tpin: str) -> str:
     """把 T拼规范表示转成兼容表示：``'`` → ``hh``，``ê`` → ``e``，
-    同时保留叠加在 ``ê`` 上的声调组合变音符号（grave/macron/acute）。"""
+    因而 ``iêq``/``üêq`` 也会显示为 ``ieq``/``üeq``；
+    同时保留声调组合变音符号（grave/macron/acute）。"""
     # ê = e + U+0302。先分解到 NFD，去掉 U+0302（circumflex），再合回 NFC。
     # 这样 ề (U+0065 U+0302 U+0300) → è，ê̄ → ē，ế → é，ê → e。
     decomposed = unicodedata.normalize('NFD', tpin)
@@ -507,6 +526,8 @@ def fetch_readings(ch: str, timeout: float = 10.0) -> tuple[tuple[str, str, str]
 # 文件即可，后续程序能自动反解析出 T拼 / 吴学。
 
 CACHE_PATH = Path(__file__).resolve().parent / 'readings.json'
+PHONOLOGY_PATH = Path(__file__).resolve().parent / 'phonology.txt'
+HANZI_PATH = Path(__file__).resolve().parent / 'hanzi.txt'
 
 _cache_lock = Lock()
 _cache: dict[str, list[dict]] = {}
@@ -1001,13 +1022,14 @@ class App:
     # -- T拼 表示切换 -------------------------------------------------------
 
     def _toggle_tpin_mode(self) -> None:
+        scroll_pos = self.output.yview()[0]
         self._tpin_compat = not self._tpin_compat
         self.tpin_mode_btn.configure(
             text='当前：T拼兼容表示' if self._tpin_compat else '当前：T拼规范表示'
         )
-        self._rerender_last()
+        self._rerender_last(scroll_pos=scroll_pos)
 
-    def _rerender_last(self) -> None:
+    def _rerender_last(self, scroll_pos: float | None = None) -> None:
         if not self._last_render_data:
             return
         self.clear()
@@ -1015,6 +1037,9 @@ class App:
             self._print_char(idx, ch, rs)
         if self._last_trailer:
             self._append(self._last_trailer, 'meta')
+        if scroll_pos is not None:
+            self.output.update_idletasks()
+            self.output.yview_moveto(scroll_pos)
 
     def _print_char(self, idx: int, ch: str, readings: list[dict]) -> None:
         self._append(f'{idx}. ', 'section')
@@ -1301,7 +1326,7 @@ def _enumerate_canonical_syllables() -> tuple[
     return canonical, aliased
 
 
-def _testphonology(verbose: bool = True) -> None:
+def _testphonology(verbose: bool = True, output_path: Path = PHONOLOGY_PATH) -> None:
     """枚举所有合法 (声母, 介音, 韵母, 声调) 组合，检查两类双向反解析：
 
       (A) 吴学字符串 ↔ 内部解码：``_compose_wxue(ini,med,fin)+tone``
@@ -1322,36 +1347,37 @@ def _testphonology(verbose: bool = True) -> None:
         ok = parts == combo
         if not ok:
             fail_ipa.append((wx, ipad, parts))
-        rows_out.append((wx, wxie, tp, ipa, ok))
+        rows_out.append((ipa, tp, wx, wxie, ok))
 
-    if verbose:
-        print(f'{"吴学":<12}{"吴协":<20}{"T拼":<14}IPA')
-        print('-' * 72)
-        for wx, wxie, tp, ipa, ok_ipa in rows_out:
-            mark = '' if ok_ipa else '  ✗IPA'
-            print(f'{wx:<12}{wxie:<20}{tp:<14}[{ipa}]{mark}')
-        print()
+    with output_path.open('w', encoding='utf-8', newline='\n') as out:
+        if verbose:
+            print(f'{"IPA":<14}{"T拼":<14}{"吴学":<12}{"吴协":<20}校验', file=out)
+            print('-' * 82, file=out)
+            for ipa, tp, wx, wxie, ok_ipa in rows_out:
+                mark = 'OK' if ok_ipa else '✗IPA'
+                print(f'{ipa:<14}{tp:<14}{wx:<12}{wxie:<20}'.ljust(74) + f'  {mark}', file=out)
+            print(file=out)
 
-    total = len(rows_out)
-    print(f'枚举到 {total} 个表层合法音节；另有 {len(aliased)} 个非表层（同形）组合。')
-    print(f'  吴学 → 内部 双向反解析：通过 {total}/{total}')
-    print(f'  IPA  → 内部 双向反解析：通过 {total - len(fail_ipa)}/{total}')
+        total = len(rows_out)
+        print(f'枚举到 {total} 个表层合法音节；另有 {len(aliased)} 个非表层（同形）组合。', file=out)
+        print(f'  吴学 → 内部 双向反解析：通过 {total}/{total}', file=out)
+        print(f'  IPA  → 内部 双向反解析：通过 {total - len(fail_ipa)}/{total}', file=out)
 
-    if fail_ipa:
-        print(f'\nIPA 反解析失败 {len(fail_ipa)} 条（显示前 30）：')
-        for wx, ipad, parts in fail_ipa[:30]:
-            print(f'  {wx!r:<14} IPA={ipad!r:<14} → {parts}')
+        if fail_ipa:
+            print(f'\nIPA 反解析失败 {len(fail_ipa)} 条（显示前 30）：', file=out)
+            for wx, ipad, parts in fail_ipa[:30]:
+                print(f'  {wx!r:<14} IPA={ipad!r:<14} → {parts}', file=out)
 
-    if aliased and verbose:
-        print(f'\n非表层（同形）组合示例（共 {len(aliased)} 条，显示前 10）：')
-        for combo, wx, parsed in aliased[:10]:
-            print(f'  {combo} 写作 {wx!r}，但 parse 为 {parsed}')
+        if aliased and verbose:
+            print(f'\n非表层（同形）组合示例（共 {len(aliased)} 条，显示前 10）：', file=out)
+            for combo, wx, parsed in aliased[:10]:
+                print(f'  {combo} 写作 {wx!r}，但 parse 为 {parsed}', file=out)
 
-    if not fail_ipa:
-        print('\n全部通过 ✓')
+        if not fail_ipa:
+            print('\n全部通过 ✓', file=out)
 
 
-def _testhanzi(verbose: bool = True) -> None:
+def _testhanzi(verbose: bool = True, output_path: Path = HANZI_PATH) -> None:
     """枚举所有合法音节，在本地 ``readings.json`` 中给每一个音节配一个示例汉字。
 
     如果某个音节在本地缓存里没有任何对应字，标「（无）」——提示该音节
@@ -1374,29 +1400,30 @@ def _testhanzi(verbose: bool = True) -> None:
     found = 0
     missing_syllables: list[str] = []
 
-    if verbose:
-        print(f'{"IPA":<14}{"T拼":<14}{"吴学":<12}{"吴协":<20}示例字')
-        print('-' * 90)
-
-    max_examples = 5
-    for wx, wxie, tp, ipa, ipad, _combo in canonical:
-        chars = ipa_to_chars.get(ipad, [])
-        if chars:
-            found += 1
-            parts = []
-            for ch, note in chars[:max_examples]:
-                parts.append(f'{ch} ({note})' if note else ch)
-            sample = '  '.join(parts)
-            if len(chars) > max_examples:
-                sample += f'  +{len(chars) - max_examples}'
-        else:
-            sample = '（无）'
-            missing_syllables.append(wx)
+    with output_path.open('w', encoding='utf-8', newline='\n') as out:
         if verbose:
-            print(f'{ipa:<14}{tp:<14}{wx:<12}{wxie:<20}'.ljust(74) + f'  {sample}')
+            print(f'{"IPA":<14}{"T拼":<14}{"吴学":<12}{"吴协":<20}示例字', file=out)
+            print('-' * 90, file=out)
 
-    total = len(canonical)
-    print(f'\n共 {total} 个表层音节，{found} 有本地字例 / {total - found} 无字例')
+        max_examples = 5
+        for wx, wxie, tp, ipa, ipad, _combo in canonical:
+            chars = ipa_to_chars.get(ipad, [])
+            if chars:
+                found += 1
+                parts = []
+                for ch, note in chars[:max_examples]:
+                    parts.append(f'{ch} ({note})' if note else ch)
+                sample = '  '.join(parts)
+                if len(chars) > max_examples:
+                    sample += f'  +{len(chars) - max_examples}'
+            else:
+                sample = '（无）'
+                missing_syllables.append(wx)
+            if verbose:
+                print(f'{ipa:<14}{tp:<14}{wx:<12}{wxie:<20}'.ljust(74) + f'  {sample}', file=out)
+
+        total = len(canonical)
+        print(f'\n共 {total} 个表层音节，{found} 有本地字例 / {total - found} 无字例', file=out)
 
 
 def _enable_dpi_awareness_and_get_scale() -> float:
@@ -1471,9 +1498,11 @@ def _apply_tk_scaling(root: tk.Tk, dpi_scale: float) -> None:
 def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == '--testphonology':
         _testphonology()
+        print(f'已写入 {PHONOLOGY_PATH}')
         return
     if len(sys.argv) > 1 and sys.argv[1] == '--testhanzi':
         _testhanzi()
+        print(f'已写入 {HANZI_PATH}')
         return
     if len(sys.argv) > 1 and sys.argv[1] == '--clear-cache':
         if CACHE_PATH.exists():

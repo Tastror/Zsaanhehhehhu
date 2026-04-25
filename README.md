@@ -11,15 +11,17 @@ python zsaanhehhehhu.py
 查看所有可能音（包括偶然缺失）
 
 ```python
-python zsaanhehhehhu.py --testhanzi > hanzi.txt
-python zsaanhehhehhu.py --testphonology > phonology.txt
+python zsaanhehhehhu.py --testhanzi
+python zsaanhehhehhu.py --testphonology
 ```
 
-<!-- 查看音系结构
+## 查看音系结构
 
 ```python
 python analyze/plot_grid.py
-``` -->
+python analyze/analyze.py
+python analyze/group_analyze.py
+```
 
 ## 功能
 
@@ -46,7 +48,7 @@ https://www.wugniu.com/search?char=搜索上海闲话&table=shanghai
 
 ### Tastror 拼音方案（简称：T拼）
 
-规范：以拼音为基础，h表浊音，q表喉塞，上海话特有的高气流浊化/z/用zs表示，ü不省写两点。
+规范：以拼音为基础，h表浊音，q表喉塞，ê表/ɪ//e//ᴇ//ɛ/附近读音，e表/ə//ɤ/附近读音，高气流化或清化/z/用zs表示，ü不省写两点。
 
 hh 一般写作符号 '，符号 ' 不方便使用的场合可用 hh。ê 一般写作符号 ê，不方便使用的场合可用 e。本文一律用 ' 和 ê。
 
@@ -57,7 +59,7 @@ hh 一般写作符号 '，符号 ' 不方便使用的场合可用 hh。ê 一般
   照z、穿c、审s、禅zs  
   见j、溪q、群jh、心x、谢xh  
   光g、框k、狂gh、牙ng  
-  影Ø、好h、匣hh或'
+  影Ø、好h、匣'\[简写hh\]
 
 - 介音
 
@@ -65,9 +67,9 @@ hh 一般写作符号 '，符号 ' 不方便使用的场合可用 hh。ê 一般
 
 - 韵母
 
-  鞋a、海ê或e、看oe、少o、口eu、瓜u、布uu、低i、虑ü、试y  
-  打an、当aan、春en、中ong、英in、君üin  
-  法aq、出eq、角oq、力iq、决üiq  
+  鞋a、海ê\[简写e\]、看oe、少o、口eu、瓜u、布uu、低i、虑ü、试y  
+  打an、当aan、春eng、中ong、英ing、君üing  
+  法aq、出eq、角oq、力iêq\[简写ieq\]、决üêq\[简写üeq\]  
   而er、亩m、唔n、五ng
 
 - 声调
@@ -76,10 +78,17 @@ hh 一般写作符号 '，符号 ' 不方便使用的场合可用 hh。ê 一般
   阴上去（通归为阴去 5）（调值 34）：ā  
   阳平上去（通归为阳去 6）（调值 23）：á  
   阴入（7）（调值 5）：aq  
-  阳入（8）（调值 12）：áq  
-  声调标在韵母（而非介音）的第一个字符上；特殊字符仍然正常标注，例如 sȳ，lǜ，hê̄ 等
+  阳入（8）（调值 12）：áq
 
-新派可不区分：an、aan；u、uu，同时 aq、eq 的开口也较为近似
+注1：音位上的 i + oe 实际形成 ü + oe /yø/，这里为减少不必要介音按 i 计（否则或者添加额外韵母，或者添加额外介音），但最终显示为 üoe。
+
+注2：一般情况下，声调标在韵母（而非介音）的第一个字符上；特殊字符仍然正常标注，例如 sȳ、lǜ、hê̄ 等；iêq、üêq 标在 ê 上。
+
+注3：新派上海话
+
+- 可能不区分 an(冷)/aan(浪)、uoe(官)/oe(干)、ioe(娟)/y(居)；
+- 后高元音 u(抓)/uu(做) 通过摩擦区分，后者有摩擦；
+- 入声 aq(客)/eq(克) 的开口较为近似。
 
 ### 吴语学堂拼音方案（简称：吴学）
 
@@ -163,8 +172,8 @@ hh 一般写作符号 '，符号 ' 不方便使用的场合可用 hh。ê 一般
 
 - 韵母
 
-  鞋a、海e、看oe、少ao、口ou[i(o)u]、瓜o、布u、低i、虑yu、试y  
-  打an、当ang、春en[u(e)n]、中ong、英in、君yun  
+  鞋a、海e、看oe、少ao、口ou\[i(o)u\]、瓜o、布u、低i、虑yu、试y  
+  打an、当ang、春en\[u(e)n\]、中ong、英in、君yun  
   法ak、出ek、角ok、力ik、决yuik  
   而er、亩m、唔n、五ng
 
@@ -189,11 +198,10 @@ hh 一般写作符号 '，符号 ' 不方便使用的场合可用 hh。ê 一般
 | 清声母 | `b p f d t z c s j q x g k h` | 1/5 | 7 |
 | 全浊 | `bh v dh zs jh xh gh '` | 6 | 8 |
 | 次浊 `m` | `m` | 1/5/6 | 7/8 |
-| 次浊鼻边 | `n n(娘) l ng` | 1/6（`n`(娘) 有 5 调特例 `niān`「仰」） | 8 |
+| 次浊鼻边 | `n(南) n(娘) l ng` | 1/6（`n`(娘) 仅有 5 调特例 `niān`「仰」） | 8 |
 | 零声母 | `Ø` | 舒声 1/5；成音节 `m/n/ng` 1/6 | 7 |
 
-T拼中的 `n` 同时是南母和
-娘母，不接 i 介音为南母 /n/，接 i 介音为娘母 /ɲ/。后文将两者分开。
+T拼中的 `n` 同时是南母和娘母，不接 i 介音为南母 /n/，接 i 介音为娘母 /ɲ/。后文将两者分开。
 
 具体细分表如下
 
@@ -242,17 +250,17 @@ T拼中的 `n` 同时是南母和
 
 共 43 对（共 4×25 = 100 个组合中的）：
 
-| 介音 | 可搭韵母（T拼） | 合计 |
+| 介音 | 可接韵母（T拼） | 合计 |
 | ------ | -------------- | ------ |
-| `Ø` | `a, ê, oe, o, eu, u, uu, i, ü, y, an, aan, en, ong, in, üin, aq, eq, oq, iq, üiq, er, m, n, ng` | 25 |
+| `Ø` | `a, ê, oe, o, eu, u, uu, i, ü, y, an, aan, eng, ong, ing, üing, aq, eq, oq, iêq, üêq, er, m, n, ng` | 25 |
 | `i` | `a, ê, oe, o, eu, an, aan, ong, aq, oq` | 10 |
-| `u` | `a, ê, oe, an, aan, en, aq, eq` | 8 |
+| `u` | `a, ê, oe, an, aan, eng, aq, eq` | 8 |
 
 **系统结论**：
 
 - 空介音 `Ø` 与全部 25 个韵母相容。
 - `i` 介音只与 **{`a, ê, oe, o, eu, an, aan, ong, aq, oq`}** 这 10 个韵母相配。
-- `u` 介音只与 **{`a, ê, oe, an, aan, en, aq, eq`}** 这 8 个韵母相配。
+- `u` 介音只与 **{`a, ê, oe, an, aan, eng, aq, eq`}** 这 8 个韵母相配。
 
 ### (3) 声母组 × 介音 × 韵母
 
@@ -264,75 +272,74 @@ T拼中的 `n` 同时是南母和
 
 #### A. 声母自然类（12 组）
 
-| 组 | T拼 | 吴学 | 描述 |
-| ---- | ---- | ---- | ---- |
-| G1 | `b p bh` | `p ph b` | 唇塞 |
-| G2 | `m` | `m` | 唇鼻 |
-| G3 | `f v` | `f v` | 唇齿擦 |
-| G4 | `d t dh` | `t th d` | 齿塞 |
-| G5 | `n`(南) `n`(娘) | `n gn` | 齿鼻 + 齿腭鼻（互补） |
-| G6 | `l` | `l` | 边音（来母） |
-| G7 | `z c s zs` | `ts tsh s z` | 齿擦 / 塞擦 |
-| G8 | `j q jh x xh` | `c ch j sh zh` | 腭塞擦 / 腭擦 |
-| G9 | `g k gh h` | `k kh g h` | 软腭塞 + 软腭擦（晓母） |
-| G10 | `ng` | `ng` | 软腭鼻（疑母） |
-| G11 | `'` | `gh` | 浊喉擦（匣母） |
-| G12 | `Ø` | `Ø` | 零声母（影母） |
+| 组 | 声母（T拼） | 描述 |
+| ---- | ---- | ---- |
+| G1 | `b p bh` | 唇塞 |
+| G2 | `m` | 唇鼻 |
+| G3 | `f v` | 唇齿擦 |
+| G4 | `d t dh` | 齿塞 |
+| G5 | `n`(南) `n`(娘) | 齿鼻、齿腭鼻 |
+| G6 | `l` | 边音 |
+| G7 | `z c s zs` | 齿擦、塞擦 |
+| G8 | `j q jh x xh` | 腭塞擦、腭擦 |
+| G9 | `g k gh h` | 软腭塞、软腭擦 |
+| G10 | `ng` | 软腭鼻 |
+| G11 | `'` | 浊喉擦 |
+| G12 | `Ø` | 零声母 |
 
 > T拼 把南母和娘母都写成 `n`：跟 `i` 介音拼的那层读 /ɲ/（娘），不跟 `i` 拼
 > 读 /n/（南）。组别归类按发音部位——南母和娘母都归 G5（齿鼻），
 > 只在 i 介音下实现为 /ɲ/。疑母 `ng` 虽也是软腭部位，但作为唯一的
 > 软腭鼻音，分布跟阻塞的 G9 不同（详见下文 B/D 表），独立成 G10。
 > 边音 `l` 虽跟南/娘共享齿部位，但它本身不带鼻音／腭化，分布也跟
-> `n/gn` 明显不一致（见 B/C 表），独立成 G6。
+> `n(南)/n(娘)` 明显不一致（见 B/C 表），独立成 G6。
 
-> **G5 组内 `n / gn` 互补分布（吴拼层面）**：
-> G5 外围的"组级"规则仍作整体看，但组内 `n`（南）和 `gn`（娘）在吴拼写法
-> 上是完全互补的——
+> **G5 组内 `n(南)/n(娘)` 互补分布（吴拼层面）**：
+> G5 外围的"组级"规则仍作整体看，但组内 `n`(南) 和 `n`(娘) 是完全互补的，
 >
-> - `gn` 只出现在 **i-起头** 的音节：`med = 'i'` **或** `fin ∈ {i, ü, in, üin, iq, üiq}`（T拼）/ `{i, iu, in, iun, iq, iuq}`（吴拼）。
-> - `n`  只出现在 **非 i-起头** 的音节；**唯一例外**是吴拼 `ni` = (n, Ø, i)——特殊文读，唯一汉字：你。T拼里和 `gn + i` 合流不再区分。
+> - `n`(娘) /ɲ/ 只出现在 **i 起头** 的音节，即 `med = 'i'` **或** `fin ∈ {i, ü, ing, üing, iêq, üêq}`。
+> - `n`(南) /n/ 只出现在 **非 i 起头** 的音节。唯一例外是 `n(南)i` /ni/ 的特殊文读，只有唯一汉字「你」，T拼里将其与 `n(娘)i` /ɲi/ 合流不再区分。
 
-#### B. 空介音（Ø）下 各组允许韵母
+#### B. 无介音（Ø）
 
-| 组 | 允许韵母（T拼） | 系统禁韵 |
+| 组 | 可接韵母（T拼） | 不可接（T拼） |
 | ---- | -------- | -------- |
-| G1 `b/p/bh` | `a ê oe o eu u uu i an aan en ong in aq eq oq iq`（17） | `ü y üin üiq er m n ng` |
+| G1 `b/p/bh` | `a ê oe o eu u uu i an aan eng ong ing aq eq oq iêq`（17） | `ü y üing üêq er m n ng` |
 | G2 `m` | 同 G1（17） | 同 G1 |
-| G3 `f/v` | `a ê eu uu i aan en ong aq eq oq`（11） | `oe o u ü y an in üin iq üiq er m n ng` |
-| G4 `d/t/dh` | `a ê oe o eu uu i an aan en ong in aq eq oq iq`（16） | `u ü y üin üiq er m n ng` |
-| G5 `n/n(娘)` | `a ê oe o u uu i ü aan en ong in aq eq oq iq üiq`（17） | `eu y an üin er m n ng` |
-| G6 `l` | `a ê oe o eu uu i ü an aan en ong in aq eq oq iq`（17） | `u y üin üiq er m n ng` |
-| G7 `z/c/s/zs` | `a ê oe o eu u uu y an aan en ong aq eq oq`（15） | `i ü in üin iq üiq er m n ng` |
-| G8 `j/q/jh/x/xh` | `i ü in üin iq üiq`（6） | 其余 19 |
-| G9 `g/k/gh/h` | `a ê oe o eu u uu an aan en ong aq eq oq`（14） | `i ü y in üin iq üiq er m n ng` |
-| G10 `ng` | `a ê oe o eu u uu an aan aq eq oq`（12） | `i ü y en ong in üin iq üiq er m n ng` |
-| G11 `'` | `a ê oe o eu u uu i ü an aan en ong in üin aq eq oq iq üiq er`（21） | `y m n ng` |
-| G12 `Ø` | `a ê oe o eu u uu i ü an aan en ong in üin aq eq oq iq üiq m n ng`（23） | `y er` |
+| G3 `f/v` | `a ê eu uu i aan eng ong aq eq oq`（11） | `oe o u ü y an ing üing iêq üêq er m n ng` |
+| G4 `d/t/dh` | `a ê oe o eu uu i an aan eng ong ing aq eq oq iêq`（16） | `u ü y üing üêq er m n ng` |
+| G5 `n(南)/n(娘)` | `a ê oe o u uu i ü aan eng ong ing aq eq oq iêq üêq`（17） | `eu y an üing er m n ng` |
+| G6 `l` | `a ê oe o eu uu i ü an aan eng ong ing aq eq oq iêq`（17） | `u y üing üêq er m n ng` |
+| G7 `z/c/s/zs` | `a ê oe o eu u uu y an aan eng ong aq eq oq`（15） | `i ü ing üing iêq üêq er m n ng` |
+| G8 `j/q/jh/x/xh` | `i ü ing üing iêq üêq`（6） | 其余 19 |
+| G9 `g/k/gh/h` | `a ê oe o eu u uu an aan eng ong aq eq oq`（14） | `i ü y ing üing iêq üêq er m n ng` |
+| G10 `ng` | `a ê oe o eu u uu an aan aq eq oq`（12） | `i ü y eng ong ing üing iêq üêq er m n ng` |
+| G11 `'` | `a ê oe o eu u uu i ü an aan eng ong ing üing aq eq oq iêq üêq er`（21） | `y m n ng` |
+| G12 `Ø` | `a ê oe o eu u uu i ü an aan eng ong ing üing aq eq oq iêq üêq m n ng`（23） | `y er` |
 
 **横向系统结论：**
 
 - **舌尖元音 `y` /ɿ/ 只见于 G7**（`z/c/s/zs`）；其余 11 组全无。
 - **`er` 只见于 G11**（`'`）；其余 11 组全无。
 - **自成音节 `m / n / ng` 只见于 G12**（零声母）；其余 11 组全无。
-- **撮口 `ü / üin / üiq`** 只见于 G5（ü/üiq）+ G6（仅 ü）+ G8 + G11 + G12；
+- **撮口 `ü / üing / üêq`** 只见于 G5（ü/üêq）+ G6（仅 ü）+ G8 + G11 + G12；
   G1 / G2 / G3 / G4 / G7 / G9 / G10 全无 —— 唇音 / 齿塞 / 齿擦 / 见组 / 疑母
   都跟 /y/ 不相容。
-- **腭音组 G8 空介音下只接 `i / ü` 系韵母** `{i, ü, in, üin, iq, üiq}`；
+- **腭音组 G8 空介音下只接 `i / ü` 系韵母** `{i, ü, ing, üing, iêq, üêq}`；
   其余 19 韵全无（腭音本身含 /j/，必须后接前高元音落脚）。
-- **`i / in / iq` 系韵母** 在 G7（齿擦）/ G9（见组）/ G10（疑）下整体全无：
+- **`i / ing / iêq` 系韵母** 在 G7（齿擦）/ G9（见组）/ G10（疑）下整体全无：
   这些组 + `/i/` 会腭化改写为 G8 声母（见组 / 晓）或 G5 娘母（疑）；G3
-  额外在 `in / iq` 也系统缺失。
-- **G5 `n/n(娘)` 与 G6 `l` 对照**：空介音下 G5 独占 `{u, üiq}`
-  （`nú`（奴） / `nüiq`（肉，即吴拼 `gniuq`） 之类），G6 独占 `{eu, an}`
+  额外在 `ing / iêq` 也系统缺失。
+- **G5 `n/n(娘)` 与 G6 `l` 对照**：空介音下 G5 独占 `{u, üêq}`
+  （`nú`（奴） / `nüêq`（肉，即吴拼 `gniuq`） 之类），G6 独占 `{eu, an}`
   （`léu`（楼） / `lán`（兰） 之类）—— 这也是 `l` 独立成 G6 的核心依据。
-- **G10 `ng` 跟 G9 `g/k/gh/h` 对照**：阻塞的 G9 还允许 `en / ong`
-  （跟 `ken`，公 `gong`），G10 `ng` 这两韵全无 —— 疑母在 `en / ong`
+- **G10 `ng` 跟 G9 `g/k/gh/h` 对照**：阻塞的 G9 还允许 `eng / ong`
+  （跟 `keng`，公 `gong`），G10 `ng` 这两韵全无 —— 疑母在 `eng / ong`
   下都不出现。
 
-#### C. `i-` 介音下 各组允许韵母
+#### C. `i` 介音
 
-| 组 + `i-` | 允许韵母（T拼） |
+| 组 + `i` | 可接韵母（T拼） |
 | ---- | -------- |
 | G1 `b/p/bh` | `o`（1） |
 | G2 `m` | `o, eu`（2） |
@@ -360,26 +367,26 @@ T拼中的 `n` 同时是南母和
 - G8 / G11 / G12 （非阻塞组）的 i 介音分布比较接近 (2) 中列出的完整
   i-med 韵母集 `{a, ê, oe, o, eu, an, aan, ong, aq, oq}`。
 
-#### D. `u-` 介音下 各组允许韵母
+#### D. `u` 介音
 
-| 组 + `u-` | 允许韵母（T拼） |
+| 组 + `u` | 可接韵母（T拼） |
 | ---- | -------- |
 | G1-G8 | **系统级全无** |
-| G9 `g/k/gh/h` | `a, ê, oe, an, aan, en, aq, eq`（8） |
+| G9 `g/k/gh/h` | `a, ê, oe, an, aan, eng, aq, eq`（8） |
 | G10 `ng` | **系统级全无** |
-| G11 `'` | `a, ê, oe, an, aan, en, aq, eq`（8） |
-| G12 `Ø` | `a, ê, oe, an, aan, en, aq, eq`（8） |
+| G11 `'` | `a, ê, oe, an, aan, eng, aq, eq`（8） |
+| G12 `Ø` | `a, ê, oe, an, aan, eng, aq, eq`（8） |
 
 **系统结论：**
 
 - **u 介音只出现在软腭塞 + 晓（G9）/ 匣（G11）/ 零声母（G12）后**。其他
   24 个声母（含疑母 `ng`、边音 `l`）都不配合口。
-- G9 / G11 / G12 三组的 u-介音韵母分布**完全一致** —— 整齐允许
-  `{a, ê, oe, an, aan, en, aq, eq}`，其他韵一概不出现。
-- G10 疑母 `ng` 虽和 G9 同为软腭，但 **`ng-` 从不带 u 介音**，与阻塞的 G9
+- G9 / G11 / G12 三组的 u 介音韵母分布**完全一致** —— 整齐允许
+  `{a, ê, oe, an, aan, eng, aq, eq}`，其他韵一概不出现。
+- G10 疑母 `ng` 虽和 G9 同为软腭，但 **`ng` 从不带 u 介音**，与阻塞的 G9
   对比鲜明——这也是 G10 独立成组的主要动机之一。
 
-#### E. 偶然缺失（组内不一致）
+#### E. 偶然缺失
 
 以上三张表按"组级"划线，再叠加 A 节末尾 G5 的 `n / gn` 互补分布。
 若组内某个声母落入"允许"的 `(组, 介音, 韵母)` 里却无字例，则纯属偶然 /
