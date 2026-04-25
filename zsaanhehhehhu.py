@@ -85,7 +85,7 @@ MEDIAL_MAP: dict[str, tuple[str, str]] = {
 # 主韵母：吴学 -> (T拼, IPA)
 FINAL_MAP: dict[str, tuple[str, str]] = {
     # 单元音 / 复合元音
-    'a':   ('a',  'a'),
+    'a':   ('a',  'ᴀ'),
     'e':   ('ê',  'ɛ'),
     'oe':  ('oe', 'ø'),
     'au':  ('o',  'ɔ'),
@@ -96,8 +96,8 @@ FINAL_MAP: dict[str, tuple[str, str]] = {
     'iu':  ('ü',  'y'),
     'y':   ('y',  'ɿ'),
     # 鼻尾韵
-    'an':  ('an',  'ã'),
-    'aon': ('aan', 'ɑ̃'),
+    'an':  ('ang',  'ᴀ̃'),
+    'aon': ('aang', 'ɑ̃'),
     'en':  ('eng', 'əŋ'),
     'on':  ('ong', 'oŋ'),
     'in':  ('ing', 'iŋ'),
@@ -508,7 +508,7 @@ def fetch_readings(ch: str, timeout: float = 10.0) -> tuple[tuple[str, str, str]
 # 本地 JSON 缓存
 # =============================================================================
 #
-# 按用户 MD 要求：查到的结果存本地 JSON，IPA 用数字后标声调形式（如 ``ɦã23``），
+# 按用户 MD 要求：查到的结果存本地 JSON，IPA 用数字后标声调形式（如 ``ɦᴀ̃23``），
 # 以后优先从本地读；没有结果也写「暂空」占位，方便手动补。
 #
 # 文件格式（扁平）::
@@ -516,7 +516,7 @@ def fetch_readings(ch: str, timeout: float = 10.0) -> tuple[tuple[str, str, str]
 #     {
 #       "字": [{"ipa": "zɿ23", "note": "", "variants": ["字"]}],
 #       "行": [
-#         {"ipa": "ɦã23", "note": "~開來，流行。白", "variants": ["行"]},
+#         {"ipa": "ɦᴀ̃23", "note": "~開來，流行。白", "variants": ["行"]},
 #         ...
 #       ],
 #       "查不到的字": []          # 空列表 = 暂空，请手动补
